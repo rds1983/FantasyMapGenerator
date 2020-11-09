@@ -4,7 +4,7 @@ using System.Drawing;
 
 namespace FantasyMapGenerator
 {
-	public class LandGenerator : BaseGenerator
+	public class LandGenerator
 	{
 		private const int MinimumIslandSize = 1000;
 		private const int MinimumLakeSize = 300;
@@ -37,8 +37,14 @@ namespace FantasyMapGenerator
 			}
 		}
 
-		public LandGenerator(GenerationContext context) : base(context)
+		public LandGenerator(LandGeneratorConfig config)
 		{
+			if (config == null)
+			{
+				throw new ArgumentNullException(nameof(config));
+			}
+
+			_config = config;
 		}
 
 		private List<Point> Build(int x, int y, Func<Point, bool> addCondition)
@@ -316,13 +322,13 @@ namespace FantasyMapGenerator
 			_landMinimum = CalculateMinimum(_config.LandPart);
 			_mountainMinimum = CalculateMinimum(_config.MountainPart);
 
-			LogInfo("Land minimum: {0:0.##}", _landMinimum);
-			LogInfo("Mountain minimum: {0:0.##}", _mountainMinimum);
+			GenerationEnvironment.LogInfo("Land minimum: {0:0.##}", _landMinimum);
+			GenerationEnvironment.LogInfo("Mountain minimum: {0:0.##}", _mountainMinimum);
 		}
 
 		private void RemoveTiles(string name, WorldMapTileType tileType, WorldMapTileType newValue)
 		{
-			LogInfo("Removing {0}...", name);
+			GenerationEnvironment.LogInfo("Removing {0}...", name);
 
 			var tilesReplaced = 0;
 
@@ -350,12 +356,12 @@ namespace FantasyMapGenerator
 				}
 			}
 
-			LogInfo("Tiles replaced: {0}", tilesReplaced);
+			GenerationEnvironment.LogInfo("Tiles replaced: {0}", tilesReplaced);
 		}
 
 		private void RemoveNoise(string name, WorldMapTileType tileType)
 		{
-			LogInfo("Removing {0}...", name);
+			GenerationEnvironment.LogInfo("Removing {0}...", name);
 			var iterations = 0;
 			var tilesReplaced = 0;
 			while (true)
@@ -396,13 +402,13 @@ namespace FantasyMapGenerator
 				}
 			}
 
-			LogInfo("Removal iterations: {0}", iterations);
-			LogInfo("Tiles replaced: {0}", tilesReplaced);
+			GenerationEnvironment.LogInfo("Removal iterations: {0}", iterations);
+			GenerationEnvironment.LogInfo("Tiles replaced: {0}", tilesReplaced);
 		}
 
 		private void GenerateForests()
 		{
-			LogInfo("Generating forests...");
+			GenerationEnvironment.LogInfo("Generating forests...");
 
 			var c = 0;
 
@@ -444,7 +450,7 @@ namespace FantasyMapGenerator
 					_result.SetWorldMapTileType(p, WorldMapTileType.Forest);
 					++c;
 
-					for (var i = 0; i < 30; ++i)
+					for (var i = 0; i < 4; ++i)
 					{
 						var dist = _random.Next(0, 25);
 						var angle = _random.Next(0, 360);
@@ -463,15 +469,8 @@ namespace FantasyMapGenerator
 			}
 		}
 
-		public GenerationResult Generate(LandGeneratorConfig config)
+		public GenerationResult Generate()
 		{
-			if (config == null)
-			{
-				throw new ArgumentNullException("config");
-			}
-
-			_config = config;
-
 			_islandMask = new bool[Size, Size];
 
 			_data = new float[Size, Size];
@@ -481,10 +480,10 @@ namespace FantasyMapGenerator
 
 			_firstDisplace = true;
 
-			LogInfo("Generating height map...");
+			GenerationEnvironment.LogInfo("Generating height map...");
 			GenerateHeightMap();
 
-			LogInfo("Postprocessing height map...");
+			GenerationEnvironment.LogInfo("Postprocessing height map...");
 			Smooth();
 			CalculateMinimums();
 
@@ -563,7 +562,7 @@ namespace FantasyMapGenerator
 
 			int tilesCount = Size * Size;
 
-			LogInfo("{0}% water, {1}% land, {2}% mountains, {3}% forests",
+			GenerationEnvironment.LogInfo("{0}% water, {1}% land, {2}% mountains, {3}% forests",
 					w * 100 / tilesCount,
 					l * 100 / tilesCount,
 					m * 100 / tilesCount,

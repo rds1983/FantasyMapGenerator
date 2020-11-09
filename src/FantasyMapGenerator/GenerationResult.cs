@@ -7,13 +7,17 @@ namespace FantasyMapGenerator
 	public class GenerationResult
 	{
 		private readonly WorldMapTileType[,] _data;
-		private readonly List<LocationInfo> _locations = new List<LocationInfo>();
 
-		public WorldMapTileType[,] Data
+		public WorldMapTileType this[int x, int y]
 		{
 			get
 			{
-				return _data;
+				return _data[x, y];
+			}
+
+			set
+			{
+				_data[x, y] = value;
 			}
 		}
 
@@ -21,7 +25,7 @@ namespace FantasyMapGenerator
 		{
 			get
 			{
-				return _data.GetLength(1);
+				return _data.GetLength(0);
 			}
 		}
 
@@ -29,17 +33,11 @@ namespace FantasyMapGenerator
 		{
 			get
 			{
-				return _data.GetLength(0);
+				return _data.GetLength(1);
 			}
 		}
 
-		public List<LocationInfo> Locations
-		{
-			get
-			{
-				return _locations;
-			}
-		}
+		public List<LocationInfo> Locations { get; } = new List<LocationInfo>();
 
 		public GenerationResult(WorldMapTileType[,] data)
 		{
@@ -53,13 +51,13 @@ namespace FantasyMapGenerator
 
 		public WorldMapTileType GetWorldMapTileType(int x, int y, WorldMapTileType def = WorldMapTileType.Water)
 		{
-			if (x < 0 || x >= _data.GetLength(1) ||
-				y < 0 || y >= _data.GetLength(0))
+			if (x < 0 || x >= Width ||
+				y < 0 || y >= Height)
 			{
 				return def;
 			}
 
-			return _data[y, x];
+			return this[x, y];
 		}
 
 		public WorldMapTileType GetWorldMapTileType(Point p, WorldMapTileType def = WorldMapTileType.Water)
@@ -69,7 +67,7 @@ namespace FantasyMapGenerator
 
 		public void SetWorldMapTileType(int x, int y, WorldMapTileType type)
 		{
-			_data[y, x] = type;
+			this[x, y] = type;
 		}
 
 		public void SetWorldMapTileType(Point p, WorldMapTileType type)

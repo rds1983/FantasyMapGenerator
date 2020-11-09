@@ -4,7 +4,7 @@ using System.Drawing;
 
 namespace FantasyMapGenerator
 {
-	public class LocationsGenerator: BaseGenerator
+	public class LocationsGenerator
 	{
 		private const int CityWidth = 65;
 		private const int CityHeight = 65;
@@ -15,8 +15,14 @@ namespace FantasyMapGenerator
 		private readonly Random _random = new Random();
 		private readonly HashSet<int> _roadTiles = new HashSet<int>();
 
-		public LocationsGenerator(GenerationContext context): base(context)
+		public LocationsGenerator(LocationsGeneratorConfig config)
 		{
+			if (config == null)
+			{
+				throw new ArgumentNullException(nameof(config));
+			}
+
+			_config = config;
 		}
 
 		private void AddToRoadTiles(Point p)
@@ -36,7 +42,7 @@ namespace FantasyMapGenerator
 			var source = _result.Locations[sourceIndex];
 			var dest = _result.Locations[destIndex];
 
-			LogInfo("Building road beetween '{0}' and '{1}'...",
+			GenerationEnvironment.LogInfo("Building road beetween '{0}' and '{1}'...",
 				source.Config.Name,
 				dest.Config.Name);
 
@@ -56,7 +62,7 @@ namespace FantasyMapGenerator
 				foreach (var h in _roadTiles)
 				{
 					var p = new Point(h % _result.Width, h / _result.Height);
-					var d = Vector2.Distance(p.ToVector2(), s.ToVector2());
+					var d = Utils.Distance(p.ToPointF(), s.ToPointF());
 
 					if (closestD == null || closestD.Value > d)
 					{
@@ -67,7 +73,8 @@ namespace FantasyMapGenerator
 				}
 			}
 
-			var pathFinder = new PathFinder(startPos,
+			// TODO:
+/*			var pathFinder = new PathFinder(startPos,
 				destPos,
 				new Point(_result.Width, _result.Height),
 				p => _result.IsRoadPlaceable(p),
@@ -84,7 +91,7 @@ namespace FantasyMapGenerator
 			{
 				_result.SetWorldMapTileType(step.Position, WorldMapTileType.Road);
 				AddToRoadTiles(step.Position);
-			}
+			}*/
 		}
 
 		public void Generate(LocationsGeneratorConfig config, GenerationResult result)
@@ -116,7 +123,7 @@ namespace FantasyMapGenerator
 			{
 				var locationConfig = _config.Locations[i];
 
-				LogInfo("Generating location {0}...", locationConfig.Name);
+				GenerationEnvironment.LogInfo("Generating location {0}...", locationConfig.Name);
 
 				// Generate city size
 				int width = CityWidth;
@@ -160,7 +167,7 @@ namespace FantasyMapGenerator
 
 					foreach (var r in areas)
 					{
-						if (r.Intersects(newArea))
+						if (r.IntersectsWith(newArea))
 						{
 							goto regenerate;
 						}

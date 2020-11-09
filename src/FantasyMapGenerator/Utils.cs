@@ -28,17 +28,6 @@ namespace FantasyMapGenerator
 			new Size(1, -1),
 		};
 
-		public static string Version
-		{
-			get
-			{
-				var assembly = typeof(Utils).Assembly;
-				var name = new AssemblyName(assembly.FullName);
-
-				return name.Version.ToString();
-			}
-		}
-
 		public static string FormatMessage(string message, params object[] args)
 		{
 			string str;
@@ -78,6 +67,18 @@ namespace FantasyMapGenerator
 					array[i, j] = value;
 				}
 			}
+		}
+
+		public static float Distance(PointF a, PointF b)
+		{
+			var delta = new PointF(b.X - a.X, b.Y - a.Y);
+
+			return (float)Math.Sqrt(delta.X * delta.X + delta.Y + delta.Y);
+		}
+
+		public static PointF ToPointF(this Point a)
+		{
+			return new PointF(a.X, a.Y);
 		}
 	}
 }
