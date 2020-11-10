@@ -10,5 +10,10 @@
 		{
 			Connected = true;
 		}
+
+		public override string ToString()
+		{
+			return Name + ", " + Connected;
+		}
 	}
 }

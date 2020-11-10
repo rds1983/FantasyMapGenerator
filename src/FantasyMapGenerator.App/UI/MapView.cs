@@ -40,7 +40,7 @@ namespace FantasyMapGenerator.App.UI
 			}
 		}
 
-		public bool IgnoreFov;
+		public SpriteFont Font = DefaultAssets.Font;
 
 		public MapView()
 		{
@@ -57,6 +57,23 @@ namespace FantasyMapGenerator.App.UI
 			if (_texture != null)
 			{
 				context.Batch.Draw(_texture, ActualBounds.Location.ToVector2(), Color.White);
+			}
+
+			if (_map != null && _map.Locations != null)
+			{
+				foreach (var location in _map.Locations)
+				{
+					var screenX = location.Position.X * ActualBounds.Width / _map.Width;
+					var screenY = location.Position.Y * ActualBounds.Height / _map.Height;
+
+					var sz = Font.MeasureString(location.Config.Name);
+					screenX -= (int)(sz.X / 2);
+
+
+					context.Batch.DrawString(Font, location.Config.Name, 
+						new Vector2(ActualBounds.X + screenX, ActualBounds.Y + screenY), 
+						Color.White);
+				}
 			}
 		}
 

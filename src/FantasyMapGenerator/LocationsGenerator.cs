@@ -1,21 +1,20 @@
-﻿using System;
+﻿using GoRogue;
+using GoRogue.Pathing;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 
 namespace FantasyMapGenerator
 {
 	public class LocationsGenerator
 	{
-		private const int CityWidth = 65;
-		private const int CityHeight = 65;
-		private const int LocationPadding = 10;
-
 		private GenerationResult _result;
-		private LocationsGeneratorConfig _config;
+		private GenerationConfig _config;
 		private readonly Random _random = new Random();
 		private readonly HashSet<int> _roadTiles = new HashSet<int>();
 
-		public LocationsGenerator(LocationsGeneratorConfig config)
+		public LocationsGenerator(GenerationConfig config)
 		{
 			if (config == null)
 			{
@@ -46,63 +45,44 @@ namespace FantasyMapGenerator
 				source.Config.Name,
 				dest.Config.Name);
 
-			// Add dest entrances to road tiles
-			foreach (var s in dest.EntranceLocations)
-			{
-				AddToRoadTiles(s);
-			}
+			AddToRoadTiles(source.Position);
 
 			// Find closest location
 			float? closestD = null;
-			var destPos = Utils.Zero;
-			var startPos = Utils.Zero;
+			var startPos = source.Position;
+			var destPos = dest.Position;
 
-			foreach (var s in source.EntranceLocations)
+			foreach (var h in _roadTiles)
 			{
-				foreach (var h in _roadTiles)
-				{
-					var p = new Point(h % _result.Width, h / _result.Height);
-					var d = Utils.Distance(p.ToPointF(), s.ToPointF());
+				var p = new Point(h % _result.Width, h / _result.Height);
+				var d = Utils.Distance(p, destPos);
 
-					if (closestD == null || closestD.Value > d)
-					{
-						closestD = d;
-						startPos = s;
-						destPos = p;
-					}
+				if (closestD == null || closestD.Value > d)
+				{
+					closestD = d;
+					startPos = p;
 				}
 			}
 
-			// TODO:
-/*			var pathFinder = new PathFinder(startPos,
-				destPos,
-				new Point(_result.Width, _result.Height),
-				p => _result.IsRoadPlaceable(p),
-				p => p == destPos);
+			var pathFinder = new AStar(_result, Distance.EUCLIDEAN);
 
-			var steps = pathFinder.Process();
+			var path = pathFinder.ShortestPath(startPos, destPos);
 
-			if (steps == null || steps.Length == 0)
+
+			if (path == null || path.Steps == null)
 			{
 				return;
 			}
 
-			foreach (var step in steps)
+			foreach (var step in path.Steps)
 			{
-				_result.SetWorldMapTileType(step.Position, WorldMapTileType.Road);
-				AddToRoadTiles(step.Position);
-			}*/
+				_result.SetWorldMapTileType(step, WorldMapTileType.Road);
+				AddToRoadTiles(step);
+			}
 		}
 
-		public void Generate(LocationsGeneratorConfig config, GenerationResult result)
+		public void Generate(GenerationResult result)
 		{
-			if (config == null)
-			{
-				throw new ArgumentNullException(nameof(config));
-			}
-
-			_config = config;
-
 			if (result == null)
 			{
 				throw new ArgumentNullException(nameof(result));
@@ -116,7 +96,7 @@ namespace FantasyMapGenerator
 			}
 
 			var pathSet = new bool[_result.Height, _result.Width];
-			var areas = new List<Rectangle>();
+			var areas = new List<Point>();
 
 			// Draw cities
 			for (var i = 0; i < _config.Locations.Count; ++i)
@@ -125,15 +105,8 @@ namespace FantasyMapGenerator
 
 				GenerationEnvironment.LogInfo("Generating location {0}...", locationConfig.Name);
 
-				// Generate city size
-				int width = CityWidth;
-				int height = CityHeight;
-
-				int totalWidth = width + 2 * LocationPadding;
-				int totalHeight = height + 2 * LocationPadding;
-
 				// Generate city location
-				var newArea = Rectangle.Empty;
+				var newPoint = Point.Empty;
 				int left, top;
 				int tries = 100;
 				while (tries > 0)
@@ -141,33 +114,24 @@ namespace FantasyMapGenerator
 					regenerate:
 					tries--;
 
-					var rnd = _random.Next(0, _result.Width - totalWidth);
+					var rnd = _random.Next(0, _result.Width - 1);
 					left = rnd;
 
-					rnd = _random.Next(0, _result.Height - totalHeight);
+					rnd = _random.Next(0, _result.Height - 1);
 					top = rnd;
 
-					// Check height
-					for (int y = top; y < top + height; y++)
+					if (!_result.IsLand(left, top))
 					{
-						for (int x = left; x < left + width; x++)
-						{
-							if (!_result.IsLand(x, y))
-							{
-								goto regenerate;
-							}
-						}
+						goto regenerate;
 					}
 
 					// And doesn't intersects with already generated cities
-					newArea.X = left;
-					newArea.Y = top;
-					newArea.Width = totalWidth;
-					newArea.Height = totalHeight;
+					newPoint.X = left;
+					newPoint.Y = top;
 
 					foreach (var r in areas)
 					{
-						if (r.IntersectsWith(newArea))
+						if (Utils.Distance(newPoint, r) < 10)
 						{
 							goto regenerate;
 						}
@@ -179,69 +143,14 @@ namespace FantasyMapGenerator
 				if (tries == 0) return;
 
 				// Save area
-				areas.Add(newArea);
+				areas.Add(newPoint);
 
-				// Remove padding from area
-				newArea.X += LocationPadding;
-				newArea.Y += LocationPadding;
-				newArea.Width -= 2 * LocationPadding;
-				newArea.Height -= 2 * LocationPadding;
-
-				var location = new LocationInfo(locationConfig);
-
-				// Fill with land
-				Point p;
-				for (var y = 0; y < newArea.Height; ++y)
+				var location = new LocationInfo(locationConfig)
 				{
-					for (var x = 0; x < newArea.Width; ++x)
-					{
-						p = new Point(x + newArea.Left,
-							y + newArea.Top);
+					Position = newPoint
+				};
 
-						_result.SetWorldMapTileType(p, WorldMapTileType.Road);
-					}
-				}
-
-				// Draw walls
-				for (var x = 0; x < newArea.Width; ++x)
-				{
-					p = new Point(x + newArea.Left, newArea.Top);
-					_result.SetWorldMapTileType(p, WorldMapTileType.Wall);
-
-					p = new Point(x + newArea.Left, newArea.Bottom - 1);
-					_result.SetWorldMapTileType(p, WorldMapTileType.Wall);
-				}
-
-				for (var y = 0; y < newArea.Height; ++y)
-				{
-					p = new Point(newArea.Left, newArea.Top + y);
-					_result.SetWorldMapTileType(p, WorldMapTileType.Wall);
-
-					p = new Point(newArea.Right - 1, newArea.Top + y);
-					_result.SetWorldMapTileType(p, WorldMapTileType.Wall);
-				}
-
-				// Add entrances
-				p = new Point(newArea.X + newArea.Width / 2,
-					newArea.Top);
-				_result.SetWorldMapTileType(p, WorldMapTileType.Road);
-				location.EntranceLocations.Add(p);
-
-				p = new Point(newArea.X,
-					newArea.Y + newArea.Height / 2);
-				_result.SetWorldMapTileType(p, WorldMapTileType.Road);
-				location.EntranceLocations.Add(p);
-
-				p = new Point(newArea.X + newArea.Width / 2,
-					newArea.Bottom - 1);
-				_result.SetWorldMapTileType(p, WorldMapTileType.Road);
-				location.EntranceLocations.Add(p);
-
-				p = new Point(newArea.Right - 1,
-					newArea.Top + newArea.Height / 2);
-				_result.SetWorldMapTileType(p, WorldMapTileType.Road);
-				location.EntranceLocations.Add(p);
-
+				_result.SetWorldMapTileType(newPoint, WorldMapTileType.Road);
 				_result.Locations.Add(location);
 			}
 

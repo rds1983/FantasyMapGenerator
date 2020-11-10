@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-	<TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
-    <AssemblyName>TroublesOfJord.Generator</AssemblyName>
-    <RootNamespace>TroublesOfJord.Generator</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="GoRogue">
+      <Version>2.6.4</Version>
+    </PackageReference>
+  </ItemGroup>
 </Project>

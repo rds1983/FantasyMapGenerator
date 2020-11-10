@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <ApplicationIcon />
     <StartupObject />
-    <TargetFramework>net45</TargetFramework>
+    <TargetFramework>net462</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

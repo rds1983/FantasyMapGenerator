@@ -11,9 +11,9 @@
     </HorizontalStackPanel>
     <HorizontalSeparator />
     <HorizontalSplitPane Id="_splitPane">
-      <Panel Id="_panelProperties" />
+      <Panel ClipToBounds="True" Id="_panelProperties" />
       <Panel>
-        <Panel Id="_panelMap" />
+        <Panel ClipToBounds="True" Id="_panelMap" />
         <Panel Id="_panelLog" />
       </Panel>
     </HorizontalSplitPane>

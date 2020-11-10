@@ -6,17 +6,9 @@ namespace FantasyMapGenerator
 {
 	public class LocationInfo
 	{
-		private readonly List<Point> _entranceLocations = new List<Point>();
-
 		public LocationConfig Config { get; private set; }
 
-		public List<Point> EntranceLocations
-		{
-			get
-			{
-				return _entranceLocations;
-			}
-		}
+		public Point Position;
 
 		public LocationInfo(LocationConfig config)
 		{

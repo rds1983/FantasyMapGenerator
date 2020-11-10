@@ -76,6 +76,11 @@ namespace FantasyMapGenerator
 			return (float)Math.Sqrt(delta.X * delta.X + delta.Y + delta.Y);
 		}
 
+		public static float Distance(Point a, Point b)
+		{
+			return Distance(a.ToPointF(), b.ToPointF());
+		}
+
 		public static PointF ToPointF(this Point a)
 		{
 			return new PointF(a.X, a.Y);

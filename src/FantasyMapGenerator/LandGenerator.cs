@@ -9,7 +9,7 @@ namespace FantasyMapGenerator
 		private const int MinimumIslandSize = 1000;
 		private const int MinimumLakeSize = 300;
 
-		private LandGeneratorConfig _config;
+		private GenerationConfig _config;
 
 		private static readonly float[,] _smoothMatrix = new float[,]
 		{
@@ -37,7 +37,7 @@ namespace FantasyMapGenerator
 			}
 		}
 
-		public LandGenerator(LandGeneratorConfig config)
+		public LandGenerator(GenerationConfig config)
 		{
 			if (config == null)
 			{

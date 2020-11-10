@@ -1,11 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using GoRogue;
+using GoRogue.MapViews;
 
 namespace FantasyMapGenerator
 {
-	public class GenerationResult
+	public class GenerationResult : IMapView<bool>
 	{
+		private static readonly HashSet<WorldMapTileType> _passableTypes = new HashSet<WorldMapTileType>
+		{
+			WorldMapTileType.Land, WorldMapTileType.Road, WorldMapTileType.Forest
+		};
+
 		private readonly WorldMapTileType[,] _data;
 
 		public WorldMapTileType this[int x, int y]
@@ -38,6 +45,12 @@ namespace FantasyMapGenerator
 		}
 
 		public List<LocationInfo> Locations { get; } = new List<LocationInfo>();
+
+		public bool this[int index1D] => throw new NotImplementedException();
+
+		public bool this[Coord pos] => _passableTypes.Contains(this[pos.X, pos.Y]) && !IsNear(pos, WorldMapTileType.Water, 2);
+
+		bool IMapView<bool>.this[int x, int y] => _passableTypes.Contains(this[x, y]) && !IsNear(new Point(x, y), WorldMapTileType.Water, 2);
 
 		public GenerationResult(WorldMapTileType[,] data)
 		{
@@ -110,13 +123,26 @@ namespace FantasyMapGenerator
 			return IsLand(p.X, p.Y);
 		}
 
-		public bool IsNear(Point p, WorldMapTileType tileType)
+		public bool IsNear(Point p, WorldMapTileType tileType, int radius = 1)
 		{
-			foreach (var d in Utils.AllDirections)
+			for(var y = p.Y - radius; y <= p.Y + radius; ++y)
 			{
-				if (GetWorldMapTileType(p + d) == tileType)
+				for(var x = p.X - radius; x <= p.X + radius; ++x)
 				{
-					return true;
+					if (x < 0 || x >= Width || y < 0 || y >= Height)
+					{
+						continue;
+					}
+
+					if (x == p.X && y == p.Y)
+					{
+						continue;
+					}
+
+					if (this[x, y] == tileType)
+					{
+						return true;
+					}
 				}
 			}
 
@@ -128,7 +154,7 @@ namespace FantasyMapGenerator
 			var tileType = GetWorldMapTileType(p);
 			return (tileType == WorldMapTileType.Land ||
 					tileType == WorldMapTileType.Road ||
-					tileType == WorldMapTileType.Forest) && 
+					tileType == WorldMapTileType.Forest) &&
 					!IsNear(p, WorldMapTileType.Mountain);
 		}
 	}

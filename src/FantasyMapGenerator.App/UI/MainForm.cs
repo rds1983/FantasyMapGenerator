@@ -11,7 +11,7 @@ namespace FantasyMapGenerator.App.UI
 	public partial class MainForm
 	{
 		private PropertyGrid _propertyGrid;
-		private LandGeneratorConfig _config;
+		private GenerationConfig _config;
 		private MapView _mapView;
 		private LogView _logView;
 		private readonly List<Action> _uiThreadActions = new List<Action>();
@@ -21,7 +21,7 @@ namespace FantasyMapGenerator.App.UI
 		{
 			BuildUI();
 
-			_config = new LandGeneratorConfig();
+			_config = new GenerationConfig();
 			_propertyGrid = new PropertyGrid
 			{
 				Object = _config
@@ -48,7 +48,7 @@ namespace FantasyMapGenerator.App.UI
 			});
 		}
 
-		private void _buttonGenerate_Click(object sender, System.EventArgs e)
+		private void _buttonGenerate_Click(object sender, EventArgs e)
 		{
 			Task.Factory.StartNew(GenerateTask);
 		}
@@ -64,8 +64,10 @@ namespace FantasyMapGenerator.App.UI
 					_panelLog.Visible = true;
 				});
 
-				var generator = new LandGenerator(_config);
-				var result = generator.Generate();
+				var landGenerator = new LandGenerator(_config);
+				var result = landGenerator.Generate();
+				var locationsGenerator = new LocationsGenerator(_config);
+				locationsGenerator.Generate(result);
 
 				_mapView.Map = result;
 			}

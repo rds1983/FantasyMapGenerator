@@ -1,8 +1,9 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
 
 namespace FantasyMapGenerator
 {
-	public class LandGeneratorConfig
+	public class GenerationConfig
 	{
 		public int WorldSize { get; set; }
 		public int HeightMapVariability { get; set; }
@@ -14,7 +15,9 @@ namespace FantasyMapGenerator
 		public bool RemoveSmallIslands { get; set; }
 		public bool RemoveSmallLakes { get; set; }
 
-		public LandGeneratorConfig()
+		public List<LocationConfig> Locations { get; } = new List<LocationConfig>();
+
+		public GenerationConfig()
 		{
 			WorldSize = 1024;
 			LandPart = 0.6f;
@@ -25,6 +28,14 @@ namespace FantasyMapGenerator
 			RemoveSmallIslands = true;
 			RemoveSmallLakes = true;
 			//			SurroundedByWater = true;
+
+			Locations.Add(new LocationConfig { Name = "Bal Harbor" });
+			Locations.Add(new LocationConfig { Name = "Westwood" });
+			Locations.Add(new LocationConfig { Name = "Goblin Mountain" });
+			Locations.Add(new LocationConfig { Name = "Kobolds Village" });
+			Locations.Add(new LocationConfig { Name = "Kuo Toans" });
+			Locations.Add(new LocationConfig { Name = "Atlantis" });
+			Locations.Add(new LocationConfig { Name = "Wagoneers" });
 		}
 
 		public override string ToString()
