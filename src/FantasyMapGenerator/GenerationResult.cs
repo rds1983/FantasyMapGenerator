@@ -48,9 +48,9 @@ namespace FantasyMapGenerator
 
 		public bool this[int index1D] => throw new NotImplementedException();
 
-		public bool this[Coord pos] => _passableTypes.Contains(this[pos.X, pos.Y]) && !IsNear(pos, WorldMapTileType.Water, 2);
+		public bool this[Coord pos] => IsPassable(pos.X, pos.Y);
 
-		bool IMapView<bool>.this[int x, int y] => _passableTypes.Contains(this[x, y]) && !IsNear(new Point(x, y), WorldMapTileType.Water, 2);
+		bool IMapView<bool>.this[int x, int y] => IsPassable(x, y);
 
 		public GenerationResult(WorldMapTileType[,] data)
 		{
@@ -60,6 +60,14 @@ namespace FantasyMapGenerator
 			}
 
 			_data = data;
+		}
+
+		public bool IsPassable(int x, int y)
+		{
+			return _passableTypes.Contains(this[x, y]) &&
+				!IsNear(new Point(x, y), WorldMapTileType.Water, 3) &&
+				!IsNear(new Point(x, y), WorldMapTileType.Mountain, 3) &&
+				Utils.Random.Next(0, 10) != 0;
 		}
 
 		public WorldMapTileType GetWorldMapTileType(int x, int y, WorldMapTileType def = WorldMapTileType.Water)
@@ -147,15 +155,6 @@ namespace FantasyMapGenerator
 			}
 
 			return false;
-		}
-
-		public bool IsRoadPlaceable(Point p)
-		{
-			var tileType = GetWorldMapTileType(p);
-			return (tileType == WorldMapTileType.Land ||
-					tileType == WorldMapTileType.Road ||
-					tileType == WorldMapTileType.Forest) &&
-					!IsNear(p, WorldMapTileType.Mountain);
 		}
 	}
 }

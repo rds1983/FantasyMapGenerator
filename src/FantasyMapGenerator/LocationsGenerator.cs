@@ -3,7 +3,6 @@ using GoRogue.Pathing;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 
 namespace FantasyMapGenerator
 {
@@ -11,7 +10,6 @@ namespace FantasyMapGenerator
 	{
 		private GenerationResult _result;
 		private GenerationConfig _config;
-		private readonly Random _random = new Random();
 		private readonly HashSet<int> _roadTiles = new HashSet<int>();
 
 		public LocationsGenerator(GenerationConfig config)
@@ -31,16 +29,8 @@ namespace FantasyMapGenerator
 			_roadTiles.Add(h);
 		}
 
-		private void Connect(int sourceIndex, int destIndex)
+		private void Connect(LocationInfo source, LocationInfo dest)
 		{
-			if (sourceIndex == destIndex)
-			{
-				return;
-			}
-
-			var source = _result.Locations[sourceIndex];
-			var dest = _result.Locations[destIndex];
-
 			GenerationEnvironment.LogInfo("Building road beetween '{0}' and '{1}'...",
 				source.Config.Name,
 				dest.Config.Name);
@@ -54,7 +44,7 @@ namespace FantasyMapGenerator
 
 			foreach (var h in _roadTiles)
 			{
-				var p = new Point(h % _result.Width, h / _result.Height);
+				var p = new Point(h % _result.Width, h / _result.Width);
 				var d = Utils.Distance(p, destPos);
 
 				if (closestD == null || closestD.Value > d)
@@ -114,13 +104,13 @@ namespace FantasyMapGenerator
 					regenerate:
 					tries--;
 
-					var rnd = _random.Next(0, _result.Width - 1);
+					var rnd = Utils.Random.Next(0, _result.Width - 1);
 					left = rnd;
 
-					rnd = _random.Next(0, _result.Height - 1);
+					rnd = Utils.Random.Next(0, _result.Height - 1);
 					top = rnd;
 
-					if (!_result.IsLand(left, top))
+					if (!_result.IsPassable(left, top))
 					{
 						goto regenerate;
 					}
@@ -131,7 +121,7 @@ namespace FantasyMapGenerator
 
 					foreach (var r in areas)
 					{
-						if (Utils.Distance(newPoint, r) < 10)
+						if (Utils.Distance(newPoint, r) < 50)
 						{
 							goto regenerate;
 						}
@@ -157,7 +147,7 @@ namespace FantasyMapGenerator
 			_roadTiles.Clear();
 			for (var i = 0; i < _result.Locations.Count - 1; ++i)
 			{
-				Connect(i, i + 1);
+				Connect(_result.Locations[i], _result.Locations[i + 1]);
 			}
 		}
 	}

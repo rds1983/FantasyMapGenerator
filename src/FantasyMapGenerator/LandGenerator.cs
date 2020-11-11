@@ -18,7 +18,6 @@ namespace FantasyMapGenerator
 			{0.1f, 0.1f, 0.1f}
 		};
 
-		private readonly Random _random = new Random();
 		private bool[,] _isSet;
 		private float[,] _data;
 		private bool _firstDisplace = true;
@@ -96,7 +95,7 @@ namespace FantasyMapGenerator
 				return 1.0f;
 			}
 
-			float p = (float)_random.NextDouble() - 0.5f;
+			float p = (float)Utils.Random.NextDouble() - 0.5f;
 			float result = (average + d * p);
 
 			return result;
@@ -166,10 +165,10 @@ namespace FantasyMapGenerator
 			// Set initial values
 			if (!_config.SurroundedByWater)
 			{
-				SetDataIfNotSet(0, 0, (float)_random.NextDouble());
-				SetDataIfNotSet(Size - 1, 0, (float)_random.NextDouble());
-				SetDataIfNotSet(0, Size - 1, (float)_random.NextDouble());
-				SetDataIfNotSet(Size - 1, Size - 1, (float)_random.NextDouble());
+				SetDataIfNotSet(0, 0, (float)Utils.Random.NextDouble());
+				SetDataIfNotSet(Size - 1, 0, (float)Utils.Random.NextDouble());
+				SetDataIfNotSet(0, Size - 1, (float)Utils.Random.NextDouble());
+				SetDataIfNotSet(Size - 1, Size - 1, (float)Utils.Random.NextDouble());
 			}
 			else
 			{
@@ -424,8 +423,8 @@ namespace FantasyMapGenerator
 					while (tries > 0)
 					{
 						--tries;
-						p.X = _random.Next(0, _result.Width);
-						p.Y = _random.Next(0, _result.Height);
+						p.X = Utils.Random.Next(0, _result.Width);
+						p.Y = Utils.Random.Next(0, _result.Height);
 
 						if (_result.IsLand(p))
 						{
@@ -452,8 +451,8 @@ namespace FantasyMapGenerator
 
 					for (var i = 0; i < 4; ++i)
 					{
-						var dist = _random.Next(0, 25);
-						var angle = _random.Next(0, 360);
+						var dist = Utils.Random.Next(0, 25);
+						var angle = Utils.Random.Next(0, 360);
 
 						var radAngle = Math.PI * angle / 180;
 

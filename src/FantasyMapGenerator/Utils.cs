@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Drawing;
-using System.Reflection;
 
 namespace FantasyMapGenerator
 {
 	internal static class Utils
 	{
 		public static Point Zero = new Point(0, 0);
+
+		public static readonly Random Random = new Random();
 
 		public static readonly Size[] AllDirections = new Size[]
 		{
@@ -73,7 +74,7 @@ namespace FantasyMapGenerator
 		{
 			var delta = new PointF(b.X - a.X, b.Y - a.Y);
 
-			return (float)Math.Sqrt(delta.X * delta.X + delta.Y + delta.Y);
+			return (float)Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y);
 		}
 
 		public static float Distance(Point a, Point b)
