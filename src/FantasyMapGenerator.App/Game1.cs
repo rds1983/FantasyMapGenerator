@@ -46,8 +46,6 @@ namespace FantasyMapGenerator.App
 			{
 				Root = _mainForm
 			};
-
-			GenerationEnvironment.InfoHandler = _mainForm.LogMessage;
 		}
 
 		protected override void Update(GameTime gameTime)

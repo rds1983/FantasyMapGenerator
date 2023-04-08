@@ -22,6 +22,9 @@ namespace FantasyMapGenerator
 			_config = config;
 		}
 
+		private void LogInfo(string msg) => _config.LogInfo(msg);
+
+
 		private void AddToRoadTiles(Point p)
 		{
 			var h = p.X + (p.Y * _result.Width);
@@ -31,9 +34,7 @@ namespace FantasyMapGenerator
 
 		private void Connect(LocationInfo source, LocationInfo dest)
 		{
-			GenerationEnvironment.LogInfo("Building road beetween '{0}' and '{1}'...",
-				source.Config.Name,
-				dest.Config.Name);
+			LogInfo($"Building road beetween '{source.Config.Name}' and '{dest.Config.Name}'...");
 
 			AddToRoadTiles(source.Position);
 
@@ -69,6 +70,8 @@ namespace FantasyMapGenerator
 				_result.SetWorldMapTileType(step, WorldMapTileType.Road);
 				AddToRoadTiles(step);
 			}
+
+			_config.MapChangedCallback?.Invoke();
 		}
 
 		public void Generate(GenerationResult result)
@@ -93,7 +96,7 @@ namespace FantasyMapGenerator
 			{
 				var locationConfig = _config.Locations[i];
 
-				GenerationEnvironment.LogInfo("Generating location {0}...", locationConfig.Name);
+				LogInfo($"Generating location {locationConfig.Name}...");
 
 				// Generate city location
 				var newPoint = Point.Empty;
@@ -142,6 +145,7 @@ namespace FantasyMapGenerator
 
 				_result.SetWorldMapTileType(newPoint, WorldMapTileType.Road);
 				_result.Locations.Add(location);
+				_config.MapChangedCallback?.Invoke();
 			}
 
 			_roadTiles.Clear();

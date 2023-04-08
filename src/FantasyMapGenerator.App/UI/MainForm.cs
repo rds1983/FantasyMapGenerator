@@ -1,4 +1,5 @@
 using Myra.Extended.Widgets;
+using Myra.Graphics2D;
 using Myra.Graphics2D.UI;
 using Myra.Graphics2D.UI.Properties;
 using System;
@@ -21,7 +22,11 @@ namespace FantasyMapGenerator.App.UI
 		{
 			BuildUI();
 
-			_config = new GenerationConfig();
+			_config = new GenerationConfig
+			{
+				LogCallback = LogMessage
+			};
+
 			_propertyGrid = new PropertyGrid
 			{
 				Object = _config
@@ -38,6 +43,8 @@ namespace FantasyMapGenerator.App.UI
 			_panelLog.Visible = false;
 
 			_buttonGenerate.Click += _buttonGenerate_Click;
+
+			_config.MapChangedCallback = _mapView.EraseTexture;
 		}
 
 		public void LogMessage(string message)
@@ -65,11 +72,11 @@ namespace FantasyMapGenerator.App.UI
 				});
 
 				var landGenerator = new LandGenerator(_config);
-				var result = landGenerator.Generate();
-				var locationsGenerator = new LocationsGenerator(_config);
-				locationsGenerator.Generate(result);
+				_mapView.Map = landGenerator.Result;
 
-				_mapView.Map = result;
+				landGenerator.Generate();
+				var locationsGenerator = new LocationsGenerator(_config);
+				locationsGenerator.Generate(landGenerator.Result);
 			}
 			finally
 			{

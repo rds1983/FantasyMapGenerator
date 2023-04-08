@@ -6,6 +6,7 @@
 		Land,
 		Forest,
 		Mountain,
+		HighMountain,
 		Wall,
 		Road
 	}

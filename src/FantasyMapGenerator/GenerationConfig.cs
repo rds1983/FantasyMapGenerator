@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 
 namespace FantasyMapGenerator
@@ -16,6 +18,12 @@ namespace FantasyMapGenerator
 		public bool RemoveSmallLakes { get; set; }
 
 		public List<LocationConfig> Locations { get; } = new List<LocationConfig>();
+
+		[Browsable(false)]
+		public Action<string> LogCallback;
+
+		[Browsable(false)]
+		public Action MapChangedCallback;
 
 		public GenerationConfig()
 		{
@@ -53,6 +61,16 @@ namespace FantasyMapGenerator
 			sb.Append("RemoveSmallLakes=" + RemoveSmallLakes);
 
 			return sb.ToString();
+		}
+
+		public void LogInfo(string msg)
+		{
+			if (LogCallback == null)
+			{
+				return;
+			}
+
+			LogCallback(msg);
 		}
 	}
 }

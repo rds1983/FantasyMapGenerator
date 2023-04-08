@@ -1,18 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <ApplicationIcon />
-    <StartupObject />
-    <TargetFramework>net462</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Resources\*.*" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.7.1.189" />
-    <PackageReference Include="Myra" Version="1.0.2.211" />
-    <PackageReference Include="Myra.Extended" Version="1.1.0.3" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
+    <PackageReference Include="Myra" Version="1.4.5" />
+    <PackageReference Include="Myra.Extended" Version="1.1.1" />
   </ItemGroup>
 
   <ItemGroup>

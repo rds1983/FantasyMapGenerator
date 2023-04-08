@@ -1,5 +1,5 @@
 <Project>
-  <Project.ExportOptions Namespace="FantasyMapGenerator.App.UI" Class="MainForm" OutputPath="C:\Projects\FantasyMapGenerator\src\FantasyMapGenerator.App\UI" />
+  <Project.ExportOptions Namespace="FantasyMapGenerator.App.UI" Class="MainForm" OutputPath="D:\Projects\FantasyMapGenerator\src\FantasyMapGenerator.App\UI" />
   <VerticalStackPanel>
     <VerticalStackPanel.Proportions>
       <Proportion Type="Auto" />

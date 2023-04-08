@@ -1,10 +1,13 @@
-﻿using Microsoft.Xna.Framework;
+﻿using FontStashSharp;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Myra;
+using Myra.Graphics2D;
 using Myra.Graphics2D.TextureAtlases;
 using Myra.Graphics2D.UI;
+using Myra.Utility;
 using System.Collections.Generic;
-using XNAssets.Utility;
+using System.Linq;
 
 namespace FantasyMapGenerator.App.UI
 {
@@ -18,6 +21,7 @@ namespace FantasyMapGenerator.App.UI
 			[WorldMapTileType.Land] = Color.Green,
 			[WorldMapTileType.Forest] = Color.DarkGreen,
 			[WorldMapTileType.Mountain] = Color.Gray,
+			[WorldMapTileType.HighMountain] = Color.White,
 			[WorldMapTileType.Wall] = Color.RosyBrown,
 			[WorldMapTileType.Road] = Color.SaddleBrown
 		};
@@ -46,7 +50,7 @@ namespace FantasyMapGenerator.App.UI
 			}
 		}
 
-		public SpriteFont Font = DefaultAssets.Font;
+		public SpriteFontBase Font = DefaultAssets.UIStylesheet.Fonts.Values.First();
 
 		public MapView()
 		{
@@ -55,7 +59,7 @@ namespace FantasyMapGenerator.App.UI
 
 			var assembly = typeof(MapView).Assembly;
 
-			using (var stream = Res.OpenResourceStream(assembly, "Resources.overworld.png"))
+			using (var stream = Res.OpenResourceStream(assembly, "FantasyMapGenerator.App.Resources.overworld.png"))
 			{
 				var texture = Texture2D.FromStream(MyraEnvironment.GraphicsDevice, stream);
 				_locationTexture = new TextureRegion(texture, new Rectangle(272, 128, 16, 16));
@@ -70,7 +74,7 @@ namespace FantasyMapGenerator.App.UI
 
 			if (_texture != null)
 			{
-				context.Batch.Draw(_texture, ActualBounds.Location.ToVector2(), Color.White);
+				context.Draw(_texture, ActualBounds.Location.ToVector2(), Color.White);
 			}
 
 			if (_map != null && _map.Locations != null)
@@ -83,7 +87,7 @@ namespace FantasyMapGenerator.App.UI
 					var sz = Font.MeasureString(location.Config.Name);
 
 					// Draw name
-					context.Batch.DrawString(Font, location.Config.Name,
+					context.DrawString(Font, location.Config.Name,
 						new Vector2(ActualBounds.X + x - sz.X / 2, ActualBounds.Y + y + LocationTextureSize.Y / 2),
 						Color.White);
 
@@ -91,7 +95,7 @@ namespace FantasyMapGenerator.App.UI
 					var rect = new Rectangle(ActualBounds.X + x - LocationTextureSize.X / 2,
 						ActualBounds.Y + y - LocationTextureSize.Y / 2,
 						LocationTextureSize.X, LocationTextureSize.Y);
-					_locationTexture.Draw(context.Batch, rect, Color.White);
+					_locationTexture.Draw(context, rect, Color.White);
 				}
 			}
 		}
@@ -122,9 +126,14 @@ namespace FantasyMapGenerator.App.UI
 			_texture.SetData(data);
 		}
 
-		public override void Arrange()
+		public void EraseTexture()
 		{
-			base.Arrange();
+			_texture = null;
+		}
+
+		public override void InternalArrange()
+		{
+			base.InternalArrange();
 
 			_texture = null;
 		}
