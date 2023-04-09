@@ -24,6 +24,18 @@ namespace FantasyMapGenerator
 
 		private void LogInfo(string msg) => _config.LogInfo(msg);
 
+		private void ReportNextStep(string name)
+		{
+			LogInfo(name);
+
+			if (_config.NextStepCallback == null)
+			{
+				return;
+			}
+
+			_config.NextStepCallback(name);
+		}
+
 
 		private void AddToRoadTiles(Point p)
 		{
@@ -34,7 +46,7 @@ namespace FantasyMapGenerator
 
 		private void Connect(LocationInfo source, LocationInfo dest)
 		{
-			LogInfo($"Building road beetween '{source.Config.Name}' and '{dest.Config.Name}'...");
+			ReportNextStep($"Building road beetween '{source.Config.Name}' and '{dest.Config.Name}'...");
 
 			AddToRoadTiles(source.Position);
 
@@ -46,7 +58,7 @@ namespace FantasyMapGenerator
 			foreach (var h in _roadTiles)
 			{
 				var p = new Point(h % _result.Width, h / _result.Width);
-				var d = Utils.Distance(p, destPos);
+				var d = MathHelper.Distance(p, destPos);
 
 				if (closestD == null || closestD.Value > d)
 				{
@@ -67,11 +79,9 @@ namespace FantasyMapGenerator
 
 			foreach (var step in path.Steps)
 			{
-				_result.SetWorldMapTileType(step, WorldMapTileType.Road);
+				_result[step.X, step.Y].TileType = TileType.Road;
 				AddToRoadTiles(step);
 			}
-
-			_config.MapChangedCallback?.Invoke();
 		}
 
 		public void Generate(GenerationResult result)
@@ -96,7 +106,7 @@ namespace FantasyMapGenerator
 			{
 				var locationConfig = _config.Locations[i];
 
-				LogInfo($"Generating location {locationConfig.Name}...");
+				ReportNextStep($"Generating location {locationConfig.Name}...");
 
 				// Generate city location
 				var newPoint = Point.Empty;
@@ -107,10 +117,10 @@ namespace FantasyMapGenerator
 					regenerate:
 					tries--;
 
-					var rnd = Utils.Random.Next(0, _result.Width - 1);
+					var rnd = MathHelper.Random.Next(0, _result.Width - 1);
 					left = rnd;
 
-					rnd = Utils.Random.Next(0, _result.Height - 1);
+					rnd = MathHelper.Random.Next(0, _result.Height - 1);
 					top = rnd;
 
 					if (!_result.IsPassable(left, top))
@@ -124,7 +134,7 @@ namespace FantasyMapGenerator
 
 					foreach (var r in areas)
 					{
-						if (Utils.Distance(newPoint, r) < 50)
+						if (MathHelper.Distance(newPoint, r) < 50)
 						{
 							goto regenerate;
 						}
@@ -143,9 +153,8 @@ namespace FantasyMapGenerator
 					Position = newPoint
 				};
 
-				_result.SetWorldMapTileType(newPoint, WorldMapTileType.Road);
+				_result[newPoint].TileType = TileType.Road;
 				_result.Locations.Add(location);
-				_config.MapChangedCallback?.Invoke();
 			}
 
 			_roadTiles.Clear();

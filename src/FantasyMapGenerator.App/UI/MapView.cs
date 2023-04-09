@@ -15,15 +15,17 @@ namespace FantasyMapGenerator.App.UI
 	{
 		private static readonly Point LocationTextureSize = new Point(32, 32);
 
-		private static readonly Dictionary<WorldMapTileType, Color> _tilesColors = new Dictionary<WorldMapTileType, Color>
+		private static readonly Dictionary<TileType, Color> _tilesColors = new()
 		{
-			[WorldMapTileType.Water] = Color.Blue,
-			[WorldMapTileType.Land] = Color.Green,
-			[WorldMapTileType.Forest] = Color.DarkGreen,
-			[WorldMapTileType.Mountain] = Color.Gray,
-			[WorldMapTileType.HighMountain] = Color.White,
-			[WorldMapTileType.Wall] = Color.RosyBrown,
-			[WorldMapTileType.Road] = Color.SaddleBrown
+			[TileType.DeepWater] = new Color(15 / 255f, 30 / 255f, 80 / 255f, 1),
+			[TileType.ShallowWater] = new Color(15 / 255f, 40 / 255f, 90 / 255f, 1),
+			[TileType.Sand] = new Color(198 / 255f, 190 / 255f, 31 / 255f, 1),
+			[TileType.Land] = Color.Green,
+			[TileType.Rock] = new Color(0.5f, 0.5f, 0.5f, 1),
+			[TileType.Snow] = new Color(1.0f, 1.0f, 1.0f, 1.0f),
+			[TileType.Forest] = Color.DarkGreen,
+			[TileType.River] = new Color(15 / 255f, 40 / 255f, 90 / 255f, 1),
+			[TileType.Road] = Color.SaddleBrown
 		};
 
 		private GenerationResult _map;
@@ -116,7 +118,7 @@ namespace FantasyMapGenerator.App.UI
 					var mapY = y * Map.Height / ActualBounds.Height;
 
 					var tile = Map[mapX, mapY];
-					var color = _tilesColors[tile];
+					var color = _tilesColors[tile.TileType];
 
 					data[y * ActualBounds.Width + x] = color;
 				}

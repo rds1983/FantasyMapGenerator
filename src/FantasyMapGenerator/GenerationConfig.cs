@@ -1,21 +1,47 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
 
 namespace FantasyMapGenerator
 {
 	public class GenerationConfig
 	{
 		public int WorldSize { get; set; }
-		public int HeightMapVariability { get; set; }
-		public float LandPart { get; set; }
-		public float MountainPart { get; set; }
-		public float ForestPart { get; set; }
-		public bool SurroundedByWater { get; set; }
-		public bool Smooth { get; set; }
-		public bool RemoveSmallIslands { get; set; }
-		public bool RemoveSmallLakes { get; set; }
+		
+		[Category("Height Map")]
+		public int TerrainOctaves = 6;
+		[Category("Height Map")]
+		public double TerrainFrequency = 1.25;
+
+		[Category("Height Map")]
+		public float DeepWaterPart = 0.1f;
+		[Category("Height Map")]
+		public float ShallowWaterPart = 0.3f;
+		[Category("Height Map")]
+		public float SandPart = 0.05f;
+		[Category("Height Map")]
+		public float LandPart = 0.4f;
+		[Category("Height Map")]
+		public float RockPart = 0.1f;
+
+		[Category("Forests")]
+		public float ForestPart = 0.1f;
+
+		[Category("Rivers")]
+		public int RiverCount = 40;
+		[Category("Rivers")]
+		public float MinRiverHeight = 0.6f;
+		[Category("Rivers")]
+		public int MaxRiverAttempts = 1000;
+		[Category("Rivers")]
+		public int MinRiverTurns = 18;
+		[Category("Rivers")]
+		public int MinRiverLength = 20;
+		[Category("Rivers")]
+		public int MaxRiverIntersections = 2;
+
+		[Category("Utility")]
+		public bool DeleteSmallObjects = false;
 
 		public List<LocationConfig> Locations { get; } = new List<LocationConfig>();
 
@@ -23,18 +49,11 @@ namespace FantasyMapGenerator
 		public Action<string> LogCallback;
 
 		[Browsable(false)]
-		public Action MapChangedCallback;
+		public Action<string> NextStepCallback;
 
 		public GenerationConfig()
 		{
 			WorldSize = 1024;
-			LandPart = 0.6f;
-			MountainPart = 0.1f;
-			ForestPart = 0.1f;
-			HeightMapVariability = 5;
-			Smooth = true;
-			RemoveSmallIslands = true;
-			RemoveSmallLakes = true;
 			//			SurroundedByWater = true;
 
 			Locations.Add(new LocationConfig { Name = "Bal Harbor" });
@@ -44,23 +63,6 @@ namespace FantasyMapGenerator
 			Locations.Add(new LocationConfig { Name = "Kuo Toans" });
 			Locations.Add(new LocationConfig { Name = "Atlantis" });
 			Locations.Add(new LocationConfig { Name = "Wagoneers" });
-		}
-
-		public override string ToString()
-		{
-			var sb = new StringBuilder();
-
-			sb.Append("WorldSize=" + WorldSize + ",\n");
-			sb.Append("HeightMapVariability=" + HeightMapVariability + ",\n");
-			sb.Append("LandPart=" + (int)(LandPart * 100.0f) + "%,\n");
-			sb.Append("MountainPart=" + (int)(MountainPart * 100.0f) + "%,\n");
-			sb.Append("ForestPart=" + (int)(ForestPart * 100.0f) + "%,\n");
-			sb.Append("SurroundedByWater=" + SurroundedByWater + ",\n");
-			sb.Append("Smooth=" + Smooth + ",\n");
-			sb.Append("RemoveSmallIslands=" + RemoveSmallIslands + ",\n");
-			sb.Append("RemoveSmallLakes=" + RemoveSmallLakes);
-
-			return sb.ToString();
 		}
 
 		public void LogInfo(string msg)

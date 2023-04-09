@@ -17,6 +17,8 @@ namespace FantasyMapGenerator.App.UI
 		private LogView _logView;
 		private readonly List<Action> _uiThreadActions = new List<Action>();
 		private AutoResetEvent _uiEvent = new AutoResetEvent(false);
+		private AutoResetEvent _stepEvent = new AutoResetEvent(false);
+		private bool _continousRun, _running = false;
 
 		public MainForm()
 		{
@@ -42,9 +44,45 @@ namespace FantasyMapGenerator.App.UI
 			_panelLog.Widgets.Add(_logView);
 			_panelLog.Visible = false;
 
-			_buttonGenerate.Click += _buttonGenerate_Click;
+			_buttonRun.Click += (s, a) =>
+			{
+				_continousRun = true;
+				Task.Factory.StartNew(GenerateTask);
+			};
 
-			_config.MapChangedCallback = _mapView.EraseTexture;
+			_buttonStep.Click += (s, a) =>
+			{
+				if (!_running)
+				{
+					_continousRun = false;
+					Task.Factory.StartNew(GenerateTask);
+				}
+				else
+				{
+					ExecuteAtUIThread(() =>
+					{
+						_buttonStep.Enabled = false;
+					});
+
+					_stepEvent.Set();
+				}
+			};
+
+			_config.NextStepCallback = (s) =>
+			{
+				_mapView.EraseTexture();
+
+				if (!_continousRun)
+				{
+					ExecuteAtUIThread(() =>
+					{
+						_buttonStep.Text = "Step: " + s;
+						_buttonStep.Enabled = true;
+					});
+
+					_stepEvent.WaitOne();
+				}
+			};
 		}
 
 		public void LogMessage(string message)
@@ -55,7 +93,7 @@ namespace FantasyMapGenerator.App.UI
 			});
 		}
 
-		private void _buttonGenerate_Click(object sender, EventArgs e)
+		private void _buttonRun_Click(object sender, EventArgs e)
 		{
 			Task.Factory.StartNew(GenerateTask);
 		}
@@ -64,9 +102,11 @@ namespace FantasyMapGenerator.App.UI
 		{
 			try
 			{
+				_running = true;
 				ExecuteAtUIThread(() =>
 				{
-					_buttonGenerate.Enabled = false;
+					_buttonRun.Enabled = false;
+					_buttonStep.Enabled = false;
 					_logView.ClearLog();
 					_panelLog.Visible = true;
 				});
@@ -80,9 +120,13 @@ namespace FantasyMapGenerator.App.UI
 			}
 			finally
 			{
+				_running = false;
 				ExecuteAtUIThread(() =>
 				{
-					_buttonGenerate.Enabled = true;
+					_mapView.EraseTexture();
+					_buttonRun.Enabled = true;
+					_buttonStep.Text = "Step";
+					_buttonStep.Enabled = true;
 					_panelLog.Visible = false;
 				});
 			}
@@ -90,7 +134,7 @@ namespace FantasyMapGenerator.App.UI
 
 		private void ExecuteAtUIThread(Action action)
 		{
-			lock(_uiThreadActions)
+			lock (_uiThreadActions)
 			{
 				_uiThreadActions.Add(action);
 			}
@@ -104,7 +148,7 @@ namespace FantasyMapGenerator.App.UI
 
 			lock (_uiThreadActions)
 			{
-				foreach(var action in _uiThreadActions)
+				foreach (var action in _uiThreadActions)
 				{
 					action();
 				}

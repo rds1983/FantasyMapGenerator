@@ -8,31 +8,22 @@ namespace FantasyMapGenerator
 {
 	public class GenerationResult : IMapView<bool>
 	{
-		private static readonly HashSet<WorldMapTileType> _passableTypes = new HashSet<WorldMapTileType>
+		private static readonly HashSet<TileType> _passableTypes = new HashSet<TileType>
 		{
-			WorldMapTileType.Land, WorldMapTileType.Road, WorldMapTileType.Forest
+			TileType.Sand, TileType.Land, TileType.Forest, TileType.Road, TileType.River
 		};
 
-		private readonly WorldMapTileType[,] _data;
+		private readonly Tile[,] _tiles;
 
-		public WorldMapTileType this[int x, int y]
-		{
-			get
-			{
-				return _data[x, y];
-			}
+		public Tile this[int x, int y] => _tiles[x, y];
+		public Tile this[Point p] => this[p.X, p.Y];
 
-			set
-			{
-				_data[x, y] = value;
-			}
-		}
 
 		public int Width
 		{
 			get
 			{
-				return _data.GetLength(0);
+				return _tiles.GetLength(0);
 			}
 		}
 
@@ -40,9 +31,18 @@ namespace FantasyMapGenerator
 		{
 			get
 			{
-				return _data.GetLength(1);
+				return _tiles.GetLength(1);
 			}
 		}
+
+		public float DeepWaterLevel { get; set; }
+		public float ShallowWaterLevel { get; set; }
+		public float SandLevel { get; set; }
+		public float LandLevel { get; set; }
+		public float RockLevel { get; set; }
+
+		public readonly List<River> Rivers = new List<River>();
+		public readonly List<RiverGroup> RiverGroups = new List<RiverGroup>();
 
 		public List<LocationInfo> Locations { get; } = new List<LocationInfo>();
 
@@ -52,25 +52,30 @@ namespace FantasyMapGenerator
 
 		bool IMapView<bool>.this[int x, int y] => IsPassable(x, y);
 
-		public GenerationResult(WorldMapTileType[,] data)
+		public GenerationResult(int width, int height)
 		{
-			if (data == null)
+			if (width <= 0)
 			{
-				throw new ArgumentNullException("data");
+				throw new ArgumentOutOfRangeException(nameof(width));
 			}
 
-			_data = data;
+			if (height <= 0)
+			{
+				throw new ArgumentOutOfRangeException(nameof(height));
+			}
+
+			_tiles = new Tile[width, height];
+
+			for (var x = 0; x < Width; ++x)
+			{
+				for (var y = 0; y < Height; ++y)
+				{
+					_tiles[x, y] = new Tile(this, x, y);
+				}
+			}
 		}
 
-		public bool IsPassable(int x, int y)
-		{
-			return _passableTypes.Contains(this[x, y]) &&
-				!IsNear(new Point(x, y), WorldMapTileType.Water, 3) &&
-				!IsNear(new Point(x, y), WorldMapTileType.Mountain, 3) &&
-				Utils.Random.Next(0, 10) != 0;
-		}
-
-		public WorldMapTileType GetWorldMapTileType(int x, int y, WorldMapTileType def = WorldMapTileType.Water)
+		public TileType GetTileType(int x, int y, TileType def = TileType.ShallowWater)
 		{
 			if (x < 0 || x >= Width ||
 				y < 0 || y >= Height)
@@ -78,64 +83,24 @@ namespace FantasyMapGenerator
 				return def;
 			}
 
-			return this[x, y];
+			return this[x, y].TileType;
 		}
 
-		public WorldMapTileType GetWorldMapTileType(Point p, WorldMapTileType def = WorldMapTileType.Water)
+		public TileType GetTileType(Point p, TileType def = TileType.ShallowWater) => GetTileType(p.X, p.Y, def);
+
+		public bool IsPassable(int x, int y)
 		{
-			return GetWorldMapTileType(p.X, p.Y, def);
+			return _passableTypes.Contains(this[x, y].TileType) &&
+				!IsNear(new Point(x, y), TileType.ShallowWater, 3) &&
+				!IsNear(new Point(x, y), TileType.Rock, 3) &&
+				MathHelper.Random.Next(0, 10) != 0;
 		}
 
-		public void SetWorldMapTileType(int x, int y, WorldMapTileType type)
+		public bool IsNear(Point p, TileType tileType, int radius = 1)
 		{
-			this[x, y] = type;
-		}
-
-		public void SetWorldMapTileType(Point p, WorldMapTileType type)
-		{
-			SetWorldMapTileType(p.X, p.Y, type);
-		}
-
-		public bool IsWater(int x, int y)
-		{
-			return GetWorldMapTileType(x, y) == WorldMapTileType.Water;
-		}
-
-		public bool IsWater(Point p)
-		{
-			return IsWater(p.X, p.Y);
-		}
-
-		public bool IsMountain(int x, int y)
-		{
-			return GetWorldMapTileType(x, y) == WorldMapTileType.Mountain;
-		}
-
-		public bool IsForest(int x, int y)
-		{
-			return GetWorldMapTileType(x, y) == WorldMapTileType.Forest;
-		}
-
-		public bool IsRoad(int x, int y)
-		{
-			return GetWorldMapTileType(x, y) == WorldMapTileType.Road;
-		}
-
-		public bool IsLand(int x, int y)
-		{
-			return GetWorldMapTileType(x, y) == WorldMapTileType.Land;
-		}
-
-		public bool IsLand(Point p)
-		{
-			return IsLand(p.X, p.Y);
-		}
-
-		public bool IsNear(Point p, WorldMapTileType tileType, int radius = 1)
-		{
-			for(var y = p.Y - radius; y <= p.Y + radius; ++y)
+			for (var y = p.Y - radius; y <= p.Y + radius; ++y)
 			{
-				for(var x = p.X - radius; x <= p.X + radius; ++x)
+				for (var x = p.X - radius; x <= p.X + radius; ++x)
 				{
 					if (x < 0 || x >= Width || y < 0 || y >= Height)
 					{
@@ -147,7 +112,7 @@ namespace FantasyMapGenerator
 						continue;
 					}
 
-					if (this[x, y] == tileType)
+					if (this[x, y].TileType == tileType)
 					{
 						return true;
 					}
@@ -155,6 +120,58 @@ namespace FantasyMapGenerator
 			}
 
 			return false;
+		}
+
+		public void Clear()
+		{
+			for (var x = 0; x < Width; ++x)
+			{
+				for (var y = 0; y < Height; ++y)
+				{
+					_tiles[x, y].Height = 0;
+					_tiles[x, y].TileType = TileType.DeepWater;
+				}
+			}
+		}
+
+		public void UpdateTileTypes()
+		{
+			for (var x = 0; x < Width; ++x)
+			{
+				for (var y = 0; y < Height; ++y)
+				{
+					var tile = this[x, y];
+					var heightValue = tile.Height;
+
+					TileType tileType;
+					if (heightValue < DeepWaterLevel)
+					{
+						tileType = TileType.DeepWater;
+					}
+					else if (heightValue < ShallowWaterLevel)
+					{
+						tileType = TileType.ShallowWater;
+					}
+					else if (heightValue < SandLevel)
+					{
+						tileType = TileType.Sand;
+					}
+					else if (heightValue < LandLevel)
+					{
+						tileType = TileType.Land;
+					}
+					else if (heightValue < RockLevel)
+					{
+						tileType = TileType.Rock;
+					}
+					else
+					{
+						tileType = TileType.Snow;
+					}
+
+					tile.TileType = tileType;
+				}
+			}
 		}
 	}
 }

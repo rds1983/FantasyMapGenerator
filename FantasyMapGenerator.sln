@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30011.22
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33414.496
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FantasyMapGenerator", "src\FantasyMapGenerator\FantasyMapGenerator.csproj", "{4B773A54-202C-408E-8504-249F8174B083}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FantasyMapGenerator.App", "src\FantasyMapGenerator.App\FantasyMapGenerator.App.csproj", "{479904D6-74E3-407F-B4B6-6881915BA93A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TinkerWorX.AccidentalNoiseLibrary", "src\AccidentalNoiseLibrary\TinkerWorX.AccidentalNoiseLibrary.csproj", "{FB77246C-37AD-4AD0-94CF-24B04F258789}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{479904D6-74E3-407F-B4B6-6881915BA93A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{479904D6-74E3-407F-B4B6-6881915BA93A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{479904D6-74E3-407F-B4B6-6881915BA93A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB77246C-37AD-4AD0-94CF-24B04F258789}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB77246C-37AD-4AD0-94CF-24B04F258789}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB77246C-37AD-4AD0-94CF-24B04F258789}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB77246C-37AD-4AD0-94CF-24B04F258789}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

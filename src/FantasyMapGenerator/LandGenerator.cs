@@ -1,33 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using TinkerWorX.AccidentalNoiseLibrary;
 
 namespace FantasyMapGenerator
 {
 	public class LandGenerator
 	{
 		private const int MinimumIslandSize = 1000;
-		private const int MinimumLakeSize = 300;
 
-		private GenerationConfig _config;
-
-		private static readonly float[,] _smoothMatrix = new float[,]
+		private readonly struct TileDirection
 		{
-			{0.1f, 0.1f, 0.1f},
-			{0.1f, 0.2f, 0.1f},
-			{0.1f, 0.1f, 0.1f}
-		};
+			public readonly Tile Tile;
+			public readonly RiverDirection Direction;
 
-		private bool[,] _isSet;
-		private float[,] _data;
-		private bool _firstDisplace = true;
+			public TileDirection(Tile tile, RiverDirection direction)
+			{
+				Tile = tile;
+				Direction = direction;
+			}
+		}
 
+		protected ImplicitFractal HeightMap;
 		private bool[,] _islandMask;
-
+		private GenerationConfig _config;
 		private GenerationResult _result;
-		private float _landMinimum;
-		private float _mountainMinimum;
-		private float _highMountainMinimum = 0.9f;
 
 		public int Size
 		{
@@ -48,8 +48,140 @@ namespace FantasyMapGenerator
 
 			_config = config;
 
-			var tiles = new WorldMapTileType[Size, Size];
-			_result = new GenerationResult(tiles);
+			HeightMap = new ImplicitFractal(FractalType.Multi,
+								 BasisType.Simplex,
+								 InterpolationType.Quintic)
+			{
+				Octaves = config.TerrainOctaves,
+				Frequency = config.TerrainFrequency,
+				Seed = MathHelper.Random.Next(0, int.MaxValue)
+			};
+
+			_result = new GenerationResult(Size, Size);
+		}
+
+		private void LogInfo(string msg) => _config.LogInfo(msg);
+
+		private void ReportNextStep(string name)
+		{
+			LogInfo(name);
+
+			if (_config.NextStepCallback == null)
+			{
+				return;
+			}
+
+			_config.NextStepCallback(name);
+		}
+
+		private void ProcessColumn(int x)
+		{
+			for (var y = 0; y < Size; y++)
+			{
+				// WRAP ON BOTH AXIS
+				// Noise range
+				float x1 = 0, x2 = 2;
+				float y1 = 0, y2 = 2;
+				float dx = x2 - x1;
+				float dy = y2 - y1;
+
+				// Sample noise at smaller intervals
+				float s = x / (float)Size;
+				float t = y / (float)Size;
+
+				// Calculate our 4D coordinates
+				float nx = x1 + MathF.Cos(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
+				float ny = y1 + MathF.Cos(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
+				float nz = x1 + MathF.Sin(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
+				float nw = y1 + MathF.Sin(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
+
+				float heightValue = (float)HeightMap.Get(nx, ny, nz, nw);
+
+				var tile = _result[x, y];
+				tile.Height = heightValue;
+			}
+		}
+
+		public void GenerateHeightMap()
+		{
+			Parallel.For(0, Size, x => ProcessColumn(x));
+
+			// Normalize tile heights
+			LogInfo("Normalizing tile heights");
+			var minHeight = float.MaxValue;
+			var maxHeight = float.MinValue;
+			for (var x = 0; x < Size; ++x)
+			{
+				for (var y = 0; y < Size; ++y)
+				{
+					var height = _result[x, y].Height;
+
+					if (height < minHeight)
+					{
+						minHeight = height;
+					}
+
+					if (height > maxHeight)
+					{
+						maxHeight = height;
+					}
+				}
+			}
+
+			for (var x = 0; x < Size; ++x)
+			{
+				for (var y = 0; y < Size; ++y)
+				{
+					var tile = _result[x, y];
+					var heightValue = (tile.Height - minHeight) / (maxHeight - minHeight);
+					tile.Height = heightValue;
+				}
+			}
+		}
+
+		private float CalculateMinimum(float minimum, float part)
+		{
+			var maximum = minimum + 0.01f;
+			while (maximum < 1.0f)
+			{
+				int c = 0;
+				Parallel.For(0, Size, y =>
+				{
+					for (int x = 0; x < Size; ++x)
+					{
+						var h = _result[x, y].Height;
+						if (minimum <= h && h <= maximum)
+						{
+							Interlocked.Increment(ref c);
+						}
+					}
+				});
+
+				float prop = (float)c / (Size * Size);
+				if (prop >= part)
+				{
+					break;
+				}
+
+				maximum += 0.01f;
+			}
+
+			return maximum;
+		}
+
+		private void CalculateMinimums()
+		{
+			LogInfo("Calculating minimums");
+			_result.DeepWaterLevel = CalculateMinimum(0.0f, _config.DeepWaterPart);
+			_result.ShallowWaterLevel = CalculateMinimum(_result.DeepWaterLevel, _config.ShallowWaterPart);
+			_result.SandLevel = CalculateMinimum(_result.ShallowWaterLevel, _config.SandPart);
+			_result.LandLevel = CalculateMinimum(_result.SandLevel, _config.LandPart);
+			_result.RockLevel = CalculateMinimum(_result.LandLevel, _config.RockPart);
+		}
+
+		private void ClearMask()
+		{
+			_islandMask.Fill(false);
 		}
 
 		private List<Point> Build(int x, int y, Func<Point, bool> addCondition)
@@ -88,257 +220,9 @@ namespace FantasyMapGenerator
 			return result;
 		}
 
-		private void ClearMask()
+		private void RemoveTiles(string name, TileType[] tileTypes)
 		{
-			_islandMask.Fill(false);
-		}
-
-		private float Displace(float average, float d)
-		{
-			if (_config.SurroundedByWater && _firstDisplace)
-			{
-				_firstDisplace = false;
-				return 1.0f;
-			}
-
-			float p = (float)Utils.Random.NextDouble() - 0.5f;
-			float result = (average + d * p);
-
-			return result;
-		}
-
-		private float GetData(int x, int y)
-		{
-			return _data[y, x];
-		}
-
-		private void SetDataIfNotSet(int x, int y, float value)
-		{
-			if (_isSet[y, x])
-			{
-				return;
-			}
-
-			_data[y, x] = value;
-
-			_isSet[y, x] = true;
-		}
-
-		private void MiddlePointDisplacement(int left, int top, int right, int bottom, float d)
-		{
-			int localWidth = right - left + 1;
-			int localHeight = bottom - top + 1;
-
-			if (localWidth <= 2 && localHeight <= 2)
-			{
-				return;
-			}
-
-			// Retrieve corner heights
-			float heightTopLeft = GetData(left, top);
-			float heightTopRight = GetData(right, top);
-			float heightBottomLeft = GetData(left, bottom);
-			float heightBottomRight = GetData(right, bottom);
-			float average = (heightTopLeft + heightTopRight + heightBottomLeft + heightBottomRight) / 4;
-
-			// Calculate center
-			int centerX = left + localWidth / 2;
-			int centerY = top + localHeight / 2;
-
-			// Square step
-			float centerHeight = Displace(average, d);
-			SetDataIfNotSet(centerX, centerY, centerHeight);
-
-			// Diamond step
-			SetDataIfNotSet(left, centerY, (heightTopLeft + heightBottomLeft + centerHeight) / 3);
-			SetDataIfNotSet(centerX, top, (heightTopLeft + heightTopRight + centerHeight) / 3);
-			SetDataIfNotSet(right, centerY, (heightTopRight + heightBottomRight + centerHeight) / 3);
-			SetDataIfNotSet(centerX, bottom, (heightBottomLeft + heightBottomRight + centerHeight) / 3);
-
-			// Sub-recursion
-			float div = 1.0f + (10.0f - _config.HeightMapVariability) / 10.0f;
-
-			d /= div;
-
-			MiddlePointDisplacement(left, top, centerX, centerY, d);
-			MiddlePointDisplacement(centerX, top, right, centerY, d);
-			MiddlePointDisplacement(left, centerY, centerX, bottom, d);
-			MiddlePointDisplacement(centerX, centerY, right, bottom, d);
-		}
-
-		public void GenerateHeightMap()
-		{
-			// Set initial values
-			if (!_config.SurroundedByWater)
-			{
-				SetDataIfNotSet(0, 0, (float)Utils.Random.NextDouble());
-				SetDataIfNotSet(Size - 1, 0, (float)Utils.Random.NextDouble());
-				SetDataIfNotSet(0, Size - 1, (float)Utils.Random.NextDouble());
-				SetDataIfNotSet(Size - 1, Size - 1, (float)Utils.Random.NextDouble());
-			}
-			else
-			{
-				SetDataIfNotSet(0, 0, 0.0f);
-				SetDataIfNotSet(Size - 1, 0, 0.0f);
-				SetDataIfNotSet(0, Size - 1, 0.0f);
-				SetDataIfNotSet(Size - 1, Size - 1, 0.0f);
-			}
-
-			// Plasma
-			MiddlePointDisplacement(0, 0, Size - 1, Size - 1, 1.0f);
-
-			// Determine min & max
-			float? min = null, max = null;
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					float v = GetData(x, y);
-
-					if (min == null || v < min)
-					{
-						min = v;
-					}
-
-					if (max == null || v > max)
-					{
-						max = v;
-					}
-				}
-			}
-
-			// Normalize
-			float delta = max.Value - min.Value;
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					float v = GetData(x, y);
-
-					v -= min.Value;
-
-					if (delta > 1.0f)
-					{
-						v /= delta;
-					}
-
-					_data[y, x] = v;
-				}
-			}
-		}
-
-		private WorldMapTileType GetTileType(Point p)
-		{
-			if (p.X < 0 || p.X >= Size || p.Y < 0 || p.Y >= Size)
-			{
-				return WorldMapTileType.Water;
-			}
-
-			var val = _data[p.Y, p.X];
-			if (val < _landMinimum)
-			{
-				return WorldMapTileType.Water;
-			} else if (val < _mountainMinimum)
-			{
-				return WorldMapTileType.Land;
-			} else if (val < _highMountainMinimum)
-			{
-				return WorldMapTileType.Mountain;
-			}
-
-			return WorldMapTileType.HighMountain;
-
-		}
-
-		private void Smooth()
-		{
-			if (!_config.Smooth)
-			{
-				return;
-			}
-
-			var oldHeightMap = new float[Size, Size];
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					oldHeightMap[y, x] = _data[y, x];
-				}
-			}
-
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					float newValue = 0;
-
-					for (int k = 0; k < Utils.AllDirections.Length; ++k)
-					{
-						int dx = x + Utils.AllDirections[k].Width;
-						int dy = y + Utils.AllDirections[k].Height;
-
-						if (dx < 0 || dx >= Size ||
-							dy < 0 || dy >= Size)
-						{
-							continue;
-						}
-
-						float value = _smoothMatrix[Utils.AllDirections[k].Height + 1, Utils.AllDirections[k].Width + 1] * oldHeightMap[dy, dx];
-						newValue += value;
-					}
-
-					newValue += _smoothMatrix[1, 1] * oldHeightMap[y, x];
-					_data[y, x] = newValue;
-				}
-			}
-		}
-
-		private float CalculateMinimum(float part)
-		{
-			float result = 0.99f;
-
-			while (result >= 0.0f)
-			{
-				int c = 0;
-				for (int y = 0; y < Size; ++y)
-				{
-					for (int x = 0; x < Size; ++x)
-					{
-						float n = GetData(x, y);
-
-						if (n >= result)
-						{
-							++c;
-						}
-					}
-				}
-
-				float prop = (float)c / (Size * Size);
-				if (prop >= part)
-				{
-					break;
-				}
-
-				result -= 0.01f;
-			}
-
-			return result;
-		}
-
-		private void LogInfo(string msg) => _config.LogInfo(msg);
-
-		private void CalculateMinimums()
-		{
-			_landMinimum = CalculateMinimum(_config.LandPart);
-			_mountainMinimum = CalculateMinimum(_config.MountainPart);
-
-			LogInfo($"Land minimum: {_landMinimum:0.##}");
-			LogInfo($"Mountain minimum: {_mountainMinimum:0.##}");
-		}
-
-		private void RemoveTiles(string name, WorldMapTileType tileType, WorldMapTileType newValue)
-		{
-			LogInfo($"Removing {name}...");
+			ReportNextStep($"Removing {name}...");
 
 			var tilesReplaced = 0;
 
@@ -349,16 +233,17 @@ namespace FantasyMapGenerator
 			{
 				for (int x = 0; x < Size; ++x)
 				{
-					if (!_islandMask[y, x] && _result.GetWorldMapTileType(x, y) == tileType)
+					if (!_islandMask[y, x] && tileTypes.Contains(_result.GetTileType(x, y)))
 					{
-						List<Point> island = Build(x, y, p => _result.GetWorldMapTileType(p) == tileType);
+						var newValue = _result[x, y].Left.TileType;
+						List<Point> island = Build(x, y, p => tileTypes.Contains(_result.GetTileType(p.X, p.Y)));
 
 						if (island.Count < MinimumIslandSize)
 						{
 							// Remove small island
 							foreach (var p in island)
 							{
-								_result.SetWorldMapTileType(p, newValue);
+								_result[p].TileType = newValue;
 								++tilesReplaced;
 							}
 						}
@@ -367,12 +252,14 @@ namespace FantasyMapGenerator
 			}
 
 			LogInfo($"Tiles replaced: {tilesReplaced}");
-			_config.MapChangedCallback?.Invoke();
 		}
 
-		private void RemoveNoise(string name, WorldMapTileType tileType)
+		private void RemoveTiles(string name, TileType tileType) => RemoveTiles(name, new TileType[] { tileType });
+
+		private void RemoveNoise(string name, TileType tileType)
 		{
-			LogInfo($"Removing {name}...");
+			ReportNextStep($"Removing {name}...");
+
 			var iterations = 0;
 			var tilesReplaced = 0;
 			while (true)
@@ -383,22 +270,22 @@ namespace FantasyMapGenerator
 				{
 					for (int x = 0; x < Size; ++x)
 					{
-						if (_result.GetWorldMapTileType(x, y) == tileType)
+						if (_result.GetTileType(x, y) == tileType)
 						{
 							continue;
 						}
 
-						for (var i = 0; i < Utils.FourDirections.Length; ++i)
+						for (var i = 0; i < MathHelper.FourDirections.Length; ++i)
 						{
-							var d = Utils.FourDirections[i];
+							var d = MathHelper.FourDirections[i];
 							var p = new Point(x + d.Width, y + d.Height);
 							var p2 = new Point(x - d.Width, y - d.Height);
 
-							if (_result.GetWorldMapTileType(p, tileType) == tileType &&
-								_result.GetWorldMapTileType(p2, tileType) == tileType)
+							if (_result.GetTileType(p, tileType) == tileType &&
+								_result.GetTileType(p2, tileType) == tileType)
 							{
 								// Turn into new value
-								_result.SetWorldMapTileType(x, y, tileType);
+								_result[x, y].TileType = tileType;
 								changed = true;
 								++tilesReplaced;
 								break;
@@ -415,13 +302,12 @@ namespace FantasyMapGenerator
 
 			LogInfo($"Removal iterations: {iterations}");
 			LogInfo($"Tiles replaced: {tilesReplaced}");
-			_config.MapChangedCallback?.Invoke();
 
 		}
 
 		private void GenerateForests()
 		{
-			LogInfo("Generating forests...");
+			ReportNextStep("Generating forests...");
 
 			var c = 0;
 
@@ -433,14 +319,14 @@ namespace FantasyMapGenerator
 				{
 					// Find starting spot
 					var tries = 100;
-					var p = Utils.Zero;
+					var p = MathHelper.Zero;
 					while (tries > 0)
 					{
 						--tries;
-						p.X = Utils.Random.Next(0, _result.Width);
-						p.Y = Utils.Random.Next(0, _result.Height);
+						p.X = MathHelper.RandomRange(0, _result.Width);
+						p.Y = MathHelper.RandomRange(0, _result.Height);
 
-						if (_result.IsLand(p))
+						if (_result[p].TileType == TileType.Land)
 						{
 							locations.Enqueue(p);
 							break;
@@ -453,126 +339,553 @@ namespace FantasyMapGenerator
 				{
 					var p = locations.Dequeue();
 
-					if (!_result.IsLand(p) ||
-						_result.IsNear(p, WorldMapTileType.Water) ||
-						_result.IsNear(p, WorldMapTileType.Mountain))
+					if (_result[p].TileType != TileType.Land ||
+						_result.IsNear(p, TileType.ShallowWater) ||
+						_result.IsNear(p, TileType.Rock))
 					{
 						continue;
 					}
 
-					_result.SetWorldMapTileType(p, WorldMapTileType.Forest);
+					_result[p].TileType = TileType.Forest;
 					++c;
 
 					for (var i = 0; i < 4; ++i)
 					{
-						var dist = Utils.Random.Next(0, 25);
-						var angle = Utils.Random.Next(0, 360);
+						var dist = MathHelper.RandomRange(0, 25);
+						var angle = MathHelper.RandomRange(0, 360);
 
 						var radAngle = Math.PI * angle / 180;
 
-						var d = new Point(p.X + (int)(Math.Cos(radAngle) * dist),
-							p.Y + (int)(Math.Sin(radAngle) * dist));
+						var d = new Point(p.X + (int)(Math.Cos(radAngle) * dist), p.Y + (int)(Math.Sin(radAngle) * dist));
 
-						if (_result.IsLand(d))
+						if (d.X < 0 || d.Y < 0 || d.X >= _result.Width || d.Y >= _result.Height)
+						{
+							continue;
+						}
+
+						if (_result[d].TileType == TileType.Land)
 						{
 							locations.Enqueue(d);
 						}
 					}
 				}
 			}
-
-			_config.MapChangedCallback?.Invoke();
 		}
 
-		private void UpdateTiles()
+		private void FindPathToWater(TileDirection? td, ref River river)
 		{
-			for (int y = 0; y < Size; ++y)
+			while (td != null)
 			{
-				for (int x = 0; x < Size; ++x)
+				var tile = td.Value.Tile;
+				var direction = td.Value.Direction;
+
+				td = null;
+				if (tile.Rivers.Contains(river))
+					continue;
+
+				// check if there is already a river on this tile
+				if (tile.Rivers.Count > 0)
+					river.Intersections++;
+
+				river.AddTile(tile);
+
+				// get neighbors
+				Tile left = tile.Left;
+				Tile right = tile.Right;
+				Tile top = tile.Top;
+				Tile bottom = tile.Bottom;
+
+				float leftValue = int.MaxValue;
+				float rightValue = int.MaxValue;
+				float topValue = int.MaxValue;
+				float bottomValue = int.MaxValue;
+
+				// query height values of neighbors
+				if (left != null && left.GetRiverNeighborCount(river) < 2 && !river.Tiles.Contains(left))
+					leftValue = left.Height;
+				if (right != null && right.GetRiverNeighborCount(river) < 2 && !river.Tiles.Contains(right))
+					rightValue = right.Height;
+				if (top != null && top.GetRiverNeighborCount(river) < 2 && !river.Tiles.Contains(top))
+					topValue = top.Height;
+				if (bottom != null && bottom.GetRiverNeighborCount(river) < 2 && !river.Tiles.Contains(bottom))
+					bottomValue = bottom.Height;
+
+				// if neighbor is existing river that is not this one, flow into it
+				if (bottom != null && bottom.Rivers.Count == 0 && !bottom.Collidable)
+					bottomValue = 0;
+				if (top != null && top.Rivers.Count == 0 && !top.Collidable)
+					topValue = 0;
+				if (left != null && left.Rivers.Count == 0 && !left.Collidable)
+					leftValue = 0;
+				if (right != null && right.Rivers.Count == 0 && !right.Collidable)
+					rightValue = 0;
+
+				// override flow direction if a tile is significantly lower
+				if (direction == RiverDirection.Left)
+					if (MathF.Abs(rightValue - leftValue) < 0.1f)
+						rightValue = int.MaxValue;
+				if (direction == RiverDirection.Right)
+					if (MathF.Abs(rightValue - leftValue) < 0.1f)
+						leftValue = int.MaxValue;
+				if (direction == RiverDirection.Top)
+					if (MathF.Abs(topValue - bottomValue) < 0.1f)
+						bottomValue = int.MaxValue;
+				if (direction == RiverDirection.Bottom)
+					if (MathF.Abs(topValue - bottomValue) < 0.1f)
+						topValue = int.MaxValue;
+
+				// find mininum
+				float min = MathF.Min(MathF.Min(MathF.Min(leftValue, rightValue), topValue), bottomValue);
+
+				// if no minimum found - exit
+				if (min == int.MaxValue)
+					continue;
+
+				//Move to next neighbor
+				if (min == leftValue)
 				{
-					_result[y, x] = GetTileType(new Point(x, y));
+					if (left != null && left.Collidable)
+					{
+						if (river.CurrentDirection != RiverDirection.Left)
+						{
+							river.TurnCount++;
+							river.CurrentDirection = RiverDirection.Left;
+						}
+
+						td = new TileDirection(left, direction);
+					}
+				}
+				else if (min == rightValue)
+				{
+					if (right != null && right.Collidable)
+					{
+						if (river.CurrentDirection != RiverDirection.Right)
+						{
+							river.TurnCount++;
+							river.CurrentDirection = RiverDirection.Right;
+						}
+						td = new TileDirection(right, direction);
+					}
+				}
+				else if (min == bottomValue)
+				{
+					if (bottom != null && bottom.Collidable)
+					{
+						if (river.CurrentDirection != RiverDirection.Bottom)
+						{
+							river.TurnCount++;
+							river.CurrentDirection = RiverDirection.Bottom;
+						}
+						td = new TileDirection(bottom, direction);
+					}
+				}
+				else if (min == topValue)
+				{
+					if (top != null && top.Collidable)
+					{
+						if (river.CurrentDirection != RiverDirection.Top)
+						{
+							river.TurnCount++;
+							river.CurrentDirection = RiverDirection.Top;
+						}
+						td = new TileDirection(top, direction);
+					}
+				}
+			}
+		}
+
+		private void GenerateRivers()
+		{
+			ReportNextStep("Generate rivers..");
+			int attempts = 0;
+			int rivercount = _config.RiverCount;
+
+			// Generate some rivers
+			while (rivercount > 0 && attempts < _config.MaxRiverAttempts)
+			{
+
+				// Get a random tile
+				int x = MathHelper.RandomRange(0, Size);
+				int y = MathHelper.RandomRange(0, Size);
+				Tile tile = _result[x, y];
+
+				// validate the tile
+				if (!tile.Collidable) continue;
+				if (tile.Rivers.Count > 0) continue;
+
+				if (tile.Height > _config.MinRiverHeight)
+				{
+					// Tile is good to start river from
+					River river = new River(rivercount);
+
+					// Figure out the direction this river will try to flow
+					river.CurrentDirection = tile.GetLowestNeighbor();
+
+					// Find a path to water
+					FindPathToWater(new TileDirection(tile, river.CurrentDirection), ref river);
+
+					// Validate the generated river 
+					if (river.TurnCount < _config.MinRiverTurns || river.Tiles.Count < _config.MinRiverLength || river.Intersections > _config.MaxRiverIntersections)
+					{
+						//Validation failed - remove this river
+						for (int i = 0; i < river.Tiles.Count; i++)
+						{
+							Tile t = river.Tiles[i];
+							t.Rivers.Remove(river);
+						}
+					}
+					else if (river.Tiles.Count >= _config.MinRiverLength)
+					{
+						//Validation passed - Add river to list
+						_result.Rivers.Add(river);
+						tile.Rivers.Add(river);
+						rivercount--;
+					}
+				}
+				attempts++;
+			}
+		}
+
+		private void BuildRiverGroups()
+		{
+			LogInfo("Build river groups..");
+
+			//loop each tile, checking if it belongs to multiple rivers
+			for (var x = 0; x < Size; x++)
+			{
+				for (var y = 0; y < Size; y++)
+				{
+					Tile t = _result[x, y];
+
+					if (t.Rivers.Count > 1)
+					{
+						// multiple rivers == intersection
+						RiverGroup group = null;
+
+						// Does a rivergroup already exist for this group?
+						for (int n = 0; n < t.Rivers.Count; n++)
+						{
+							River tileriver = t.Rivers[n];
+							for (int i = 0; i < _result.RiverGroups.Count; i++)
+							{
+								for (int j = 0; j < _result.RiverGroups[i].Rivers.Count; j++)
+								{
+									River river = _result.RiverGroups[i].Rivers[j];
+									if (river.ID == tileriver.ID)
+									{
+										group = _result.RiverGroups[i];
+									}
+									if (group != null) break;
+								}
+								if (group != null) break;
+							}
+							if (group != null) break;
+						}
+
+						// existing group found -- add to it
+						if (group != null)
+						{
+							for (int n = 0; n < t.Rivers.Count; n++)
+							{
+								if (!group.Rivers.Contains(t.Rivers[n]))
+									group.Rivers.Add(t.Rivers[n]);
+							}
+						}
+						else   //No existing group found - create a new one
+						{
+							group = new RiverGroup();
+							for (int n = 0; n < t.Rivers.Count; n++)
+							{
+								group.Rivers.Add(t.Rivers[n]);
+							}
+							_result.RiverGroups.Add(group);
+						}
+					}
+				}
+			}
+		}
+
+		private void DigRiver(River river)
+		{
+			int counter = 0;
+
+			// How wide are we digging this river?
+			int size = MathHelper.RandomRange(1, 5);
+			river.Length = river.Tiles.Count;
+
+			// randomize size change
+			int two = river.Length / 2;
+			int three = two / 2;
+			int four = three / 2;
+			int five = four / 2;
+
+			int twomin = two / 3;
+			int threemin = three / 3;
+			int fourmin = four / 3;
+			int fivemin = five / 3;
+
+			// randomize lenght of each size
+			int count1 = MathHelper.RandomRange(fivemin, five);
+			if (size < 4)
+			{
+				count1 = 0;
+			}
+			int count2 = count1 + MathHelper.RandomRange(fourmin, four);
+			if (size < 3)
+			{
+				count2 = 0;
+				count1 = 0;
+			}
+			int count3 = count2 + MathHelper.RandomRange(threemin, three);
+			if (size < 2)
+			{
+				count3 = 0;
+				count2 = 0;
+				count1 = 0;
+			}
+			int count4 = count3 + MathHelper.RandomRange(twomin, two);
+
+			// Make sure we are not digging past the river path
+			if (count4 > river.Length)
+			{
+				int extra = count4 - river.Length;
+				while (extra > 0)
+				{
+					if (count1 > 0) { count1--; count2--; count3--; count4--; extra--; }
+					else if (count2 > 0) { count2--; count3--; count4--; extra--; }
+					else if (count3 > 0) { count3--; count4--; extra--; }
+					else if (count4 > 0) { count4--; extra--; }
 				}
 			}
 
-			_config.MapChangedCallback?.Invoke();
+			// Dig it out
+			for (int i = river.Tiles.Count - 1; i >= 0; i--)
+			{
+				Tile t = river.Tiles[i];
+
+				if (counter < count1)
+				{
+					t.DigRiver(river, 4);
+				}
+				else if (counter < count2)
+				{
+					t.DigRiver(river, 3);
+				}
+				else if (counter < count3)
+				{
+					t.DigRiver(river, 2);
+				}
+				else if (counter < count4)
+				{
+					t.DigRiver(river, 1);
+				}
+				else
+				{
+					t.DigRiver(river, 0);
+				}
+				counter++;
+			}
+		}
+
+		// Dig river based on a parent river vein
+		private void DigRiver(River river, River parent)
+		{
+			int intersectionID = 0;
+			int intersectionSize = 0;
+
+			// determine point of intersection
+			for (int i = 0; i < river.Tiles.Count; i++)
+			{
+				Tile t1 = river.Tiles[i];
+				for (int j = 0; j < parent.Tiles.Count; j++)
+				{
+					Tile t2 = parent.Tiles[j];
+					if (t1 == t2)
+					{
+						intersectionID = i;
+						intersectionSize = t2.RiverSize;
+					}
+				}
+			}
+
+			int counter = 0;
+			int intersectionCount = river.Tiles.Count - intersectionID;
+			int size = MathHelper.RandomRange(intersectionSize, 5);
+			river.Length = river.Tiles.Count;
+
+			// randomize size change
+			int two = river.Length / 2;
+			int three = two / 2;
+			int four = three / 2;
+			int five = four / 2;
+
+			int twomin = two / 3;
+			int threemin = three / 3;
+			int fourmin = four / 3;
+			int fivemin = five / 3;
+
+			// randomize length of each size
+			int count1 = MathHelper.RandomRange(fivemin, five);
+			if (size < 4)
+			{
+				count1 = 0;
+			}
+			int count2 = count1 + MathHelper.RandomRange(fourmin, four);
+			if (size < 3)
+			{
+				count2 = 0;
+				count1 = 0;
+			}
+			int count3 = count2 + MathHelper.RandomRange(threemin, three);
+			if (size < 2)
+			{
+				count3 = 0;
+				count2 = 0;
+				count1 = 0;
+			}
+			int count4 = count3 + MathHelper.RandomRange(twomin, two);
+
+			// Make sure we are not digging past the river path
+			if (count4 > river.Length)
+			{
+				int extra = count4 - river.Length;
+				while (extra > 0)
+				{
+					if (count1 > 0) { count1--; count2--; count3--; count4--; extra--; }
+					else if (count2 > 0) { count2--; count3--; count4--; extra--; }
+					else if (count3 > 0) { count3--; count4--; extra--; }
+					else if (count4 > 0) { count4--; extra--; }
+				}
+			}
+
+			// adjust size of river at intersection point
+			if (intersectionSize == 1)
+			{
+				count4 = intersectionCount;
+				count1 = 0;
+				count2 = 0;
+				count3 = 0;
+			}
+			else if (intersectionSize == 2)
+			{
+				count3 = intersectionCount;
+				count1 = 0;
+				count2 = 0;
+			}
+			else if (intersectionSize == 3)
+			{
+				count2 = intersectionCount;
+				count1 = 0;
+			}
+			else if (intersectionSize == 4)
+			{
+				count1 = intersectionCount;
+			}
+			else
+			{
+				count1 = 0;
+				count2 = 0;
+				count3 = 0;
+				count4 = 0;
+			}
+
+			// dig out the river
+			for (int i = river.Tiles.Count - 1; i >= 0; i--)
+			{
+
+				Tile t = river.Tiles[i];
+
+				if (counter < count1)
+				{
+					t.DigRiver(river, 4);
+				}
+				else if (counter < count2)
+				{
+					t.DigRiver(river, 3);
+				}
+				else if (counter < count3)
+				{
+					t.DigRiver(river, 2);
+				}
+				else if (counter < count4)
+				{
+					t.DigRiver(river, 1);
+				}
+				else
+				{
+					t.DigRiver(river, 0);
+				}
+				counter++;
+			}
+		}
+
+		private void DigRiverGroups()
+		{
+			LogInfo("Dig river groups");
+
+			for (int i = 0; i < _result.RiverGroups.Count; i++)
+			{
+				RiverGroup group = _result.RiverGroups[i];
+				River longest = null;
+
+				//Find longest river in this group
+				for (int j = 0; j < group.Rivers.Count; j++)
+				{
+					River river = group.Rivers[j];
+					if (longest == null)
+						longest = river;
+					else if (longest.Tiles.Count < river.Tiles.Count)
+						longest = river;
+				}
+
+				if (longest != null)
+				{
+					//Dig out longest path first
+					DigRiver(longest);
+
+					for (int j = 0; j < group.Rivers.Count; j++)
+					{
+						River river = group.Rivers[j];
+						if (river != longest)
+						{
+							DigRiver(river, longest);
+						}
+					}
+				}
+			}
 		}
 
 		public void Generate()
 		{
 			_islandMask = new bool[Size, Size];
+			_result.Clear();
 
-			_data = new float[Size, Size];
-			_isSet = new bool[Size, Size];
-			_data.Fill(0.0f);
-			_isSet.Fill(false);
-
-			_firstDisplace = true;
-
-			// Fill with water
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					_result[y, x] = WorldMapTileType.Water;
-				}
-			}
-			_config.MapChangedCallback?.Invoke();
-
-			LogInfo("Generating height map...");
+			ReportNextStep("Generating height map...");
 			GenerateHeightMap();
-
-			LogInfo("Postprocessing height map...");
-			Smooth();
 			CalculateMinimums();
-			UpdateTiles();
+			_result.UpdateTileTypes();
 
-			if (_config.RemoveSmallIslands)
+			if (_config.DeleteSmallObjects)
 			{
-				RemoveTiles("small islands", WorldMapTileType.Land, WorldMapTileType.Water);
+				RemoveTiles("small islands", new[] { TileType.Sand, TileType.Land });
+				RemoveTiles("small lakes", new[] { TileType.DeepWater, TileType.ShallowWater, TileType.Sand });
+				RemoveNoise("water noise", TileType.ShallowWater);
+
+				RemoveTiles("small mountains", TileType.Rock);
+				RemoveNoise("mountain noise", TileType.Rock);
+				RemoveNoise("snow noise", TileType.Snow);
 			}
 
-			if (_config.RemoveSmallLakes)
-			{
-				RemoveTiles("small lakes", WorldMapTileType.Water, WorldMapTileType.Land);
-				RemoveNoise("water noise", WorldMapTileType.Land);
-			}
-
-			RemoveTiles("small mountains", WorldMapTileType.Mountain, WorldMapTileType.Land);
-			RemoveNoise("mountain noise", WorldMapTileType.Mountain);
-
+			// Forests
 			GenerateForests();
 
-			RemoveTiles("small forests", WorldMapTileType.Forest, WorldMapTileType.Land);
-			RemoveNoise("forest noise", WorldMapTileType.Forest);
+			RemoveTiles("small forests", TileType.Forest);
+			RemoveNoise("forest noise", TileType.Forest);
 
-			// Calculate amount of different tiles
-			int w = 0, l = 0, m = 0, f = 0;
-			for (int y = 0; y < Size; ++y)
-			{
-				for (int x = 0; x < Size; ++x)
-				{
-					var tileType = _result.GetWorldMapTileType(x, y);
-					switch (tileType)
-					{
-						case WorldMapTileType.Water:
-							++w;
-							break;
-						case WorldMapTileType.Land:
-							++l;
-							break;
-						case WorldMapTileType.Forest:
-							++f;
-							break;
-						case WorldMapTileType.Mountain:
-							++m;
-							break;
-					}
-				}
-			}
-
-			int tilesCount = Size * Size;
-			LogInfo($"{w * 100 / tilesCount}% water, {l * 100 / tilesCount}% land, {m * 100 / tilesCount}% mountains, {f * 100 / tilesCount}% forests");
-			_config.MapChangedCallback?.Invoke();
+			// Rivers
+			GenerateRivers();
+			BuildRiverGroups();
+			DigRiverGroups();
 		}
 	}
 }
