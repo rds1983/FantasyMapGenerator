@@ -76,7 +76,6 @@ namespace FantasyMapGenerator
 
 		private void ProcessColumn(int x)
 		{
-			var perlin = new Perlin();
 			for (var y = 0; y < Size; y++)
 			{
 				// WRAP ON BOTH AXIS
