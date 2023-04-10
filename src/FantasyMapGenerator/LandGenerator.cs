@@ -76,26 +76,39 @@ namespace FantasyMapGenerator
 
 		private void ProcessColumn(int x)
 		{
+			var perlin = new Perlin();
 			for (var y = 0; y < Size; y++)
 			{
 				// WRAP ON BOTH AXIS
 				// Noise range
 				float x1 = 0, x2 = 2;
 				float y1 = 0, y2 = 2;
-				float dx = x2 - x1;
-				float dy = y2 - y1;
 
 				// Sample noise at smaller intervals
 				float s = x / (float)Size;
 				float t = y / (float)Size;
 
-				// Calculate our 4D coordinates
-				float nx = x1 + MathF.Cos(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
-				float ny = y1 + MathF.Cos(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
-				float nz = x1 + MathF.Sin(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
-				float nw = y1 + MathF.Sin(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
 
-				float heightValue = (float)HeightMap.Get(nx, ny, nz, nw);
+				float nx, ny, nz, nw;
+
+				if (_config.SphericalWorld)
+				{
+					// Calculate our 4D coordinates
+					float dx = x2 - x1;
+					float dy = y2 - y1;
+					nx = x1 + MathF.Cos(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
+					ny = y1 + MathF.Cos(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
+					nz = x1 + MathF.Sin(s * 2 * MathF.PI) * dx / (2 * MathF.PI);
+					nw = y1 + MathF.Sin(t * 2 * MathF.PI) * dy / (2 * MathF.PI);
+				}
+				else
+				{
+					nx = s;
+					ny = t;
+					nz = nw = 0;
+				}
+
+				var heightValue = (float)HeightMap.Get(nx, ny, nz, nw);
 
 				var tile = _result[x, y];
 				tile.Height = heightValue;

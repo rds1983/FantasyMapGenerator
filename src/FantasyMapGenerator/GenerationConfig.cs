@@ -41,6 +41,9 @@ namespace FantasyMapGenerator
 		public int MaxRiverIntersections = 2;
 
 		[Category("Utility")]
+		public bool SphericalWorld = true;
+
+		[Category("Utility")]
 		public bool DeleteSmallObjects = false;
 
 		public List<LocationConfig> Locations { get; } = new List<LocationConfig>();
